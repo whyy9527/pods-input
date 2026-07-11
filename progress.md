@@ -61,3 +61,14 @@ Turn the Web Racer sensor demo into a small arcade game while keeping AirPods ti
 - Five-second idle test produced no false jump.
 - Live browser capture did not observe a deliberate flick (range -0.16 to +0.74 degrees), so hardware trigger direction/threshold remains a user-playtest item.
 - Work review passed with hardware gesture tuning explicitly retained as residual risk rather than reported as verified.
+
+## Generated sprite and difficulty pass
+
+- Generated a new top-down crimson future-bike sprite, removed its chroma-key background, and trimmed transparent padding to a 290x1087 RGBA asset.
+- Replaced the wide vector fairing with the generated sprite while preserving lean, jump, shadow, and crash feedback.
+- Narrowed the collision body from 44 to 30 logical pixels and shortened it from 108 to 96.
+- Increased the opening spawn delay from 0.8s to 1.1s and relaxed the traffic interval from 1.05s/0.52s minimum to 1.25s/0.68s minimum.
+- Verify sprite clarity at neutral and full lean, then rerun normal-collision and jump-clear regressions.
+- Generated sprite passed screenshot inspection at full lean; it reads clearly without the previous wide silhouette.
+- Normal collision regression passed (lives 3 to 2 after 250 frames).
+- Timed jump-clear regression passed (`clears=1`, `jumps=1`, lives remains 3).

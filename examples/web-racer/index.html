@@ -49,6 +49,8 @@
     const menu = document.querySelector('#menu');
     const message = document.querySelector('#message');
     const startButton = document.querySelector('#start');
+    const bikeImage = new Image();
+    bikeImage.src = 'assets/future-bike.png';
     const keys = new Set();
     const lanes = [350, 500, 650];
     const spawnPattern = [1, 0, 2, 1, 2, 0, 1, 0, 2];
@@ -65,8 +67,8 @@
 
     const state = {
       mode: 'ready', score: 0, best: Number(localStorage.getItem('podsinput-best') || 0), lives: 3, clears: 0, jumps: 0,
-      elapsed: 0, speed: 260, spawnTimer: 0.8, spawnIndex: 0, roadOffset: 0,
-      player: { x: 500, y: 590, width: 44, height: 108, lean: 0, jumpRemaining: 0, jumpCooldown: 0, invulnerable: 0 }, obstacles: [], particles: []
+      elapsed: 0, speed: 260, spawnTimer: 1.1, spawnIndex: 0, roadOffset: 0,
+      player: { x: 500, y: 590, width: 30, height: 96, lean: 0, jumpRemaining: 0, jumpCooldown: 0, invulnerable: 0 }, obstacles: [], particles: []
     };
 
     function resize() {
@@ -78,7 +80,7 @@
     resize();
 
     function resetGame() {
-      Object.assign(state, { mode: 'playing', score: 0, lives: 3, clears: 0, jumps: 0, elapsed: 0, speed: 260, spawnTimer: 0.8, spawnIndex: 0, roadOffset: 0, obstacles: [], particles: [] });
+      Object.assign(state, { mode: 'playing', score: 0, lives: 3, clears: 0, jumps: 0, elapsed: 0, speed: 260, spawnTimer: 1.1, spawnIndex: 0, roadOffset: 0, obstacles: [], particles: [] });
       Object.assign(state.player, { x: 500, y: 590, lean: 0, jumpRemaining: 0, jumpCooldown: 0, invulnerable: 0 });
       menu.hidden = true;
       render();
@@ -126,7 +128,7 @@
       state.spawnTimer -= dt;
       if (state.spawnTimer <= 0) {
         spawnObstacle();
-        state.spawnTimer += Math.max(0.52, 1.05 - state.elapsed * 0.008);
+        state.spawnTimer += Math.max(0.68, 1.25 - state.elapsed * 0.007);
       }
 
       const keyboard = (keys.has('ArrowRight') ? 1 : 0) - (keys.has('ArrowLeft') ? 1 : 0);
@@ -170,22 +172,14 @@
       const lean = bike.lean;
       const jumpHeight = bike.jumpHeight || 0;
       context.save(); context.globalAlpha = alpha; context.translate(bike.x, bike.y);
-      context.fillStyle = `rgba(15, 24, 34, ${0.72 - jumpHeight / 220})`; context.beginPath(); context.ellipse(-lean * 11 + 7, 7, 28 + jumpHeight * .08, 56 + jumpHeight * .05, 0, 0, Math.PI * 2); context.fill();
+      context.fillStyle = `rgba(15, 24, 34, ${0.68 - jumpHeight / 230})`; context.beginPath(); context.ellipse(-lean * 9 + 5, 8, 19 + jumpHeight * .07, 54 + jumpHeight * .04, 0, 0, Math.PI * 2); context.fill();
       context.translate(0, -jumpHeight * .16); context.scale(1 + jumpHeight / 430, 1 + jumpHeight / 430); context.rotate(lean * 0.24);
-      context.fillStyle = '#05080c'; context.beginPath(); context.roundRect(-9, -55, 18, 20, 8); context.roundRect(-9, 39, 18, 20, 8); context.fill();
-      context.fillStyle = '#bf1734'; context.beginPath(); context.roundRect(-27, -43, 54, 86, 22); context.fill();
-      context.fillStyle = '#ed2f4d';
-      context.beginPath(); context.moveTo(-27, -32); context.quadraticCurveTo(-32, -51, -9, -58); context.lineTo(9, -58); context.quadraticCurveTo(32, -51, 27, -32); context.lineTo(24, 21); context.quadraticCurveTo(19, 49, 0, 54); context.quadraticCurveTo(-19, 49, -24, 21); context.closePath(); context.fill();
-      context.fillStyle = '#f84a61'; context.beginPath(); context.roundRect(-31, -20, 12, 52, 6); context.roundRect(19, -20, 12, 52, 6); context.fill();
-      context.fillStyle = '#871126'; context.beginPath(); context.roundRect(-19, 22, 38, 25, 12); context.fill();
-      context.fillStyle = '#1b2530'; context.beginPath(); context.ellipse(0, -4, 18, 27, 0, 0, Math.PI * 2); context.fill();
-      context.fillStyle = '#f2c7a5'; context.beginPath(); context.arc(0, -18, 9, 0, Math.PI * 2); context.fill();
-      context.fillStyle = '#e8edf2'; context.beginPath(); context.arc(0, -20, 11, Math.PI, Math.PI * 2); context.fill();
-      context.fillStyle = '#8edfff'; context.beginPath(); context.roundRect(-9, -25, 18, 6, 3); context.fill();
-      context.strokeStyle = '#e7edf2'; context.lineWidth = 4; context.lineCap = 'round'; context.beginPath(); context.moveTo(-22, -29); context.lineTo(22, -29); context.stroke();
-      context.fillStyle = '#ffe06a'; context.beginPath(); context.roundRect(-12, -44, 24, 8, 4); context.fill();
-      context.fillStyle = '#fff'; context.fillRect(-27, 4, 7, 17); context.fillRect(20, 4, 7, 17);
-      context.fillStyle = '#8b1024'; context.beginPath(); context.arc(-24, 36, 5, 0, Math.PI * 2); context.arc(24, 36, 5, 0, Math.PI * 2); context.fill();
+      if (bikeImage.complete && bikeImage.naturalWidth) {
+        context.drawImage(bikeImage, -18, -67, 36, 134);
+      } else {
+        context.fillStyle = '#ed2f4d'; context.beginPath(); context.roundRect(-15, -58, 30, 116, 15); context.fill();
+        context.fillStyle = '#ffe06a'; context.fillRect(-8, -52, 16, 7);
+      }
       context.restore();
     }
 
