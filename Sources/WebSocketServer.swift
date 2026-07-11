@@ -10,15 +10,25 @@ final class WebSocketServer {
     private var channel: Channel?
     private var clients: [ObjectIdentifier: Channel] = [:]
     private let clientsLock = NSLock()
+    private let onCalibrate: @Sendable () -> Void
+
+    init(onCalibrate: @escaping @Sendable () -> Void) {
+        self.onCalibrate = onCalibrate
+    }
 
     func start(port: Int) throws {
         let upgrader = NIOWebSocketServerUpgrader(
-            shouldUpgrade: { channel, _ in channel.eventLoop.makeSucceededFuture(HTTPHeaders()) },
+            shouldUpgrade: { channel, request in
+                let origin = request.headers.first(name: "Origin")
+                let allowed = origin == nil || origin == "null" || Self.isLocalOrigin(origin)
+                return channel.eventLoop.makeSucceededFuture(allowed ? HTTPHeaders() : nil)
+            },
             upgradePipelineHandler: { [weak self] channel, _ in
                 guard let self else { return channel.eventLoop.makeSucceededVoidFuture() }
                 return channel.pipeline.addHandler(WebSocketHandler(
                     onConnect: { self.add($0) },
-                    onDisconnect: { self.remove($0) }
+                    onDisconnect: { self.remove($0) },
+                    onCalibrate: self.onCalibrate
                 ))
             }
         )
@@ -69,6 +79,11 @@ final class WebSocketServer {
         clients.removeValue(forKey: ObjectIdentifier(channel))
         clientsLock.unlock()
     }
+
+    private static func isLocalOrigin(_ origin: String?) -> Bool {
+        guard let origin, let host = URL(string: origin)?.host else { return false }
+        return host == "localhost" || host == "127.0.0.1" || host == "::1"
+    }
 }
 
 private final class WebSocketHandler: ChannelInboundHandler {
@@ -76,11 +91,17 @@ private final class WebSocketHandler: ChannelInboundHandler {
     typealias OutboundOut = WebSocketFrame
     private let onConnect: (Channel) -> Void
     private let onDisconnect: (Channel) -> Void
+    private let onCalibrate: @Sendable () -> Void
     private var isClosing = false
 
-    init(onConnect: @escaping (Channel) -> Void, onDisconnect: @escaping (Channel) -> Void) {
+    init(
+        onConnect: @escaping (Channel) -> Void,
+        onDisconnect: @escaping (Channel) -> Void,
+        onCalibrate: @escaping @Sendable () -> Void
+    ) {
         self.onConnect = onConnect
         self.onDisconnect = onDisconnect
+        self.onCalibrate = onCalibrate
     }
 
     func handlerAdded(context: ChannelHandlerContext) { onConnect(context.channel) }
@@ -99,6 +120,14 @@ private final class WebSocketHandler: ChannelInboundHandler {
             context.writeAndFlush(wrapOutboundOut(response)).whenComplete { _ in
                 context.close(promise: nil)
             }
+        } else if frame.opcode == .text {
+            let data = Data(frame.unmaskedData.readableBytesView)
+            guard let command = try? JSONDecoder().decode(ControlCommand.self, from: data),
+                  command.protocolVersion == PodsInputProtocol.version,
+                  command.type == "calibrate" else {
+                return
+            }
+            onCalibrate()
         }
     }
 

@@ -60,6 +60,16 @@ public struct MotionEvent: Codable, Equatable, Sendable {
     }
 }
 
+public struct ControlCommand: Codable, Equatable, Sendable {
+    public let protocolVersion: Int
+    public let type: String
+
+    public init(type: String) {
+        protocolVersion = PodsInputProtocol.version
+        self.type = type
+    }
+}
+
 public extension Vector3 {
     static let zero = Vector3(x: 0, y: 0, z: 0)
 }

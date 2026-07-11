@@ -13,7 +13,9 @@ AirPods already contain low-latency motion sensors, but most software only uses 
 - AirPods motion input through `CMHeadphoneMotionManager`
 - Neutral-position calibration and angle-safe smoothing
 - Versioned WebSocket protocol on `127.0.0.1:17604`
+- Browser connections restricted to local origins
 - Simulation mode for development without headphones
+- Explicit neutral-pose recalibration over the control protocol
 - Zero-build Web Racer example
 
 This is not yet an accessibility product or a production input driver. Hardware behaviour still needs to be measured with AirPods Pro 2 and AirPods 4.

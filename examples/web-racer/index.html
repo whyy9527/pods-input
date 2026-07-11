@@ -11,6 +11,8 @@
     canvas { display: block; width: 100vw; height: 100vh; }
     .hud { position: fixed; inset: 24px 24px auto; display: flex; justify-content: space-between; pointer-events: none; }
     .panel { padding: 12px 16px; border: 1px solid #ffffff2b; border-radius: 14px; background: #07111fbd; backdrop-filter: blur(12px); }
+    button { margin-top: 8px; padding: 7px 12px; border: 1px solid #ffffff38; border-radius: 8px; background: #ffffff14; color: inherit; cursor: pointer; pointer-events: auto; }
+    button:hover { background: #ffffff24; }
     #status[data-connected="true"] { color: #72f1b8; }
     kbd { padding: 2px 7px; border: 1px solid #ffffff38; border-radius: 6px; background: #ffffff12; }
   </style>
@@ -18,7 +20,7 @@
 <body>
   <canvas id="game"></canvas>
   <div class="hud">
-    <div class="panel"><strong>PodsInput Web Racer</strong><br><span id="status">Connecting…</span></div>
+    <div class="panel"><strong>PodsInput Web Racer</strong><br><span id="status">Connecting…</span><br><button id="center" type="button">Center</button></div>
     <div class="panel">Tilt your head to steer · <kbd>←</kbd> <kbd>→</kbd> fallback<br><span id="telemetry">roll 0.0°</span></div>
   </div>
   <script>
@@ -26,6 +28,7 @@
     const context = canvas.getContext('2d');
     const status = document.querySelector('#status');
     const telemetry = document.querySelector('#telemetry');
+    const centerButton = document.querySelector('#center');
     let width = 0, height = 0, carX = 0, target = 0, roadOffset = 0;
     const keys = new Set();
 
@@ -38,8 +41,9 @@
     addEventListener('keydown', event => keys.add(event.key));
     addEventListener('keyup', event => keys.delete(event.key));
 
+    let socket;
     function connect() {
-      const socket = new WebSocket('ws://127.0.0.1:17604');
+      socket = new WebSocket('ws://127.0.0.1:17604');
       socket.onopen = () => { status.textContent = 'AirPods stream connected'; status.dataset.connected = 'true'; };
       socket.onclose = () => { status.textContent = 'Waiting for PodsInput…'; status.dataset.connected = 'false'; setTimeout(connect, 1000); };
       socket.onmessage = event => {
@@ -51,6 +55,12 @@
         telemetry.textContent = `roll ${degrees.toFixed(1)}° · steering ${target.toFixed(2)}`;
       };
     }
+    centerButton.addEventListener('click', () => {
+      if (socket?.readyState !== WebSocket.OPEN) return;
+      target = 0;
+      status.textContent = 'Centering… hold still';
+      socket.send(JSON.stringify({ protocolVersion: 1, type: 'calibrate' }));
+    });
     connect();
 
     function frame() {

@@ -35,7 +35,11 @@ do {
     try require(decoded.type == "motion", "event type failed")
     try require(decoded.sequence == 2, "sequence failed")
 
-    print("PodsInput self-test passed: calibration, smoothing, angle wrapping, protocol v1")
+    let commandData = Data(#"{"protocolVersion":1,"type":"calibrate"}"#.utf8)
+    let command = try JSONDecoder().decode(ControlCommand.self, from: commandData)
+    try require(command == ControlCommand(type: "calibrate"), "calibration command failed")
+
+    print("PodsInput self-test passed: calibration, smoothing, angle wrapping, protocol v1 control")
 } catch {
     fputs("PodsInput self-test failed: \(error)\n", stderr)
     exit(1)

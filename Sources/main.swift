@@ -16,7 +16,31 @@ if let portIndex = arguments.firstIndex(of: "--port") {
     port = 17_604
 }
 
-let server = WebSocketServer()
+final class CalibrationRequest: @unchecked Sendable {
+    private let lock = NSLock()
+    private var requested = false
+
+    func request() {
+        lock.lock()
+        requested = true
+        lock.unlock()
+    }
+
+    func consume() -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        guard requested else { return false }
+        requested = false
+        return true
+    }
+}
+
+var source: HeadphoneMotionSource?
+let simulationCalibration = CalibrationRequest()
+let server = WebSocketServer {
+    source?.calibrate()
+    simulationCalibration.request()
+}
 do {
     try server.start(port: port)
     print("PodsInput protocol v\(PodsInputProtocol.version) listening at ws://127.0.0.1:\(port)")
@@ -25,22 +49,33 @@ do {
     exit(1)
 }
 
-var source: HeadphoneMotionSource?
 var simulationTimer: DispatchSourceTimer?
 
 if simulate {
     let timer = DispatchSource.makeTimerSource(queue: .global(qos: .userInteractive))
     var processor = MotionProcessor(smoothing: 0.35)
     var tick = 0.0
+    var calibrationTicksRemaining = 0
     timer.schedule(deadline: .now(), repeating: .milliseconds(16))
     timer.setEventHandler {
         tick += 0.035
+        let orientation = Orientation(
+            pitch: sin(tick * 0.7) * 0.08,
+            yaw: sin(tick * 0.4) * 0.12,
+            roll: sin(tick) * 0.45
+        )
+        if simulationCalibration.consume() {
+            calibrationTicksRemaining = 50
+        }
+        if calibrationTicksRemaining > 0 {
+            calibrationTicksRemaining -= 1
+            if calibrationTicksRemaining == 0 {
+                processor.calibrate(to: orientation)
+            }
+            return
+        }
         let event = processor.process(
-            orientation: Orientation(
-                pitch: sin(tick * 0.7) * 0.08,
-                yaw: sin(tick * 0.4) * 0.12,
-                roll: sin(tick) * 0.45
-            ),
+            orientation: orientation,
             timestamp: Date().timeIntervalSince1970
         )
         server.broadcast(event)
