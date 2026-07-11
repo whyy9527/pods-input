@@ -82,3 +82,13 @@ Turn the Web Racer sensor demo into a small arcade game while keeping AirPods ti
 - Traffic montage and gameplay screenshots passed alpha-edge and silhouette inspection for all four models.
 - Early gameplay shows Model 3 then Model Y; later jump capture shows Cybercab and Cybertruck.
 - Normal collision still reduces lives from 3 to 2; jump clear still records `clears=1`, `jumps=1`, with 3 lives.
+
+## Generated city and curved-road pass
+
+- Generated a restrained top-down cyberpunk megacity background with rooftops, machinery, wet concrete, and sparse cyan/magenta light.
+- Replaced the procedural neon-box side scenery with a compressed scrolling WebP city texture.
+- Added a gentle scrolling S-curve shared by road geometry, lane markings, traffic lanes, player bounds, and observable game state.
+- Verify curve readability, traffic alignment, player bounds, collision, and jump clear.
+- Curved-road gameplay screenshot passed: road shape is readable, generated city sides remain subdued, and traffic follows lane curvature.
+- Center-lane collision passed on the moving curve (lives 3 to 2).
+- Curved-road jump clear passed (`clears=1`, `jumps=1`, lives remains 3).

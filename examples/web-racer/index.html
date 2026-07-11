@@ -51,6 +51,8 @@
     const startButton = document.querySelector('#start');
     const bikeImage = new Image();
     bikeImage.src = 'assets/future-bike.png';
+    const cityImage = new Image();
+    cityImage.src = 'assets/cyber-city-v2.webp';
     const trafficTypes = [
       { name: 'Model 3', src: 'assets/traffic/model-3.png', width: 54, height: 112 },
       { name: 'Model Y', src: 'assets/traffic/model-y.png', width: 58, height: 112 },
@@ -59,7 +61,6 @@
     ];
     for (const traffic of trafficTypes) { traffic.image = new Image(); traffic.image.src = traffic.src; }
     const keys = new Set();
-    const lanes = [350, 500, 650];
     const spawnPattern = [1, 0, 2, 1, 2, 0, 1, 0, 2];
     let width = 0;
     let height = 0;
@@ -103,10 +104,16 @@
     }
 
     function spawnObstacle() {
-      const lane = lanes[spawnPattern[state.spawnIndex++ % spawnPattern.length]];
+      const laneIndex = spawnPattern[state.spawnIndex++ % spawnPattern.length];
       const type = (state.spawnIndex - 1) % trafficTypes.length;
       const traffic = trafficTypes[type];
-      state.obstacles.push({ x: lane, y: -110, width: traffic.width, height: traffic.height, type });
+      const y = -110;
+      state.obstacles.push({ x: roadCenter(y) + (laneIndex - 1) * 150, y, width: traffic.width, height: traffic.height, type, laneIndex });
+    }
+
+    function roadCenter(y) {
+      const travel = state.elapsed * 115;
+      return 500 + Math.sin((y + travel) / 175) * 42 + Math.sin((y + travel) / 310 + 1.1) * 14;
     }
 
     function overlaps(a, b) {
@@ -142,7 +149,8 @@
 
       const keyboard = (keys.has('ArrowRight') ? 1 : 0) - (keys.has('ArrowLeft') ? 1 : 0);
       const steering = keyboard || tilt;
-      state.player.x = Math.max(290, Math.min(710, state.player.x + steering * 330 * dt));
+      const playerRoadCenter = roadCenter(state.player.y);
+      state.player.x = Math.max(playerRoadCenter - 210, Math.min(playerRoadCenter + 210, state.player.x + steering * 330 * dt));
       state.player.lean += (steering - state.player.lean) * Math.min(1, dt * 8);
       state.player.invulnerable = Math.max(0, state.player.invulnerable - dt);
       state.player.jumpRemaining = Math.max(0, state.player.jumpRemaining - dt);
@@ -153,6 +161,7 @@
 
       for (const obstacle of state.obstacles) {
         obstacle.y += state.speed * dt;
+        obstacle.x = roadCenter(obstacle.y) + (obstacle.laneIndex - 1) * 150;
         if (!obstacle.hit && !obstacle.jumped && overlaps(state.player, obstacle)) {
           if (jumpHeight > 24) {
             if (!obstacle.jumped) { obstacle.jumped = true; state.clears += 1; state.score += 25; }
@@ -181,22 +190,23 @@
     }
 
     function drawCyberCity() {
-      const backdrop = context.createLinearGradient(0, 0, 1000, 700);
-      backdrop.addColorStop(0, '#09051a'); backdrop.addColorStop(.5, '#171032'); backdrop.addColorStop(1, '#07081c');
-      context.fillStyle = backdrop; context.fillRect(0, 0, 1000, 700);
-      for (let side = 0; side < 2; side++) {
-        const startX = side ? 790 : 24;
-        for (let row = -1; row < 6; row++) {
-          const y = row * 145 + state.roadOffset * .65;
-          const buildingWidth = 150 + ((row * 31 + side * 17) % 48);
-          context.fillStyle = row % 2 ? '#17162b' : '#211438';
-          context.fillRect(startX, y, buildingWidth, 112);
-          context.strokeStyle = side ? '#ff3bd455' : '#28e7ff55'; context.lineWidth = 3; context.strokeRect(startX, y, buildingWidth, 112);
-          for (let windowRow = 0; windowRow < 3; windowRow++) {
-            context.fillStyle = (row + windowRow) % 2 ? '#ff3bd4aa' : '#28e7ffbb';
-            context.fillRect(startX + 18, y + 18 + windowRow * 28, buildingWidth - 36, 5);
-          }
-        }
+      context.fillStyle = '#080811'; context.fillRect(0, 0, 1000, 700);
+      if (!cityImage.complete || !cityImage.naturalWidth) return;
+      const offset = (state.elapsed * 72) % 1500;
+      context.globalAlpha = .84;
+      context.drawImage(cityImage, 0, offset - 1500, 1000, 1500);
+      context.drawImage(cityImage, 0, offset, 1000, 1500);
+      context.globalAlpha = 1;
+      const veil = context.createLinearGradient(0, 0, 1000, 0);
+      veil.addColorStop(0, '#05051022'); veil.addColorStop(.5, '#0b0a1900'); veil.addColorStop(1, '#05051022');
+      context.fillStyle = veil; context.fillRect(0, 0, 1000, 700);
+    }
+
+    function traceRoadEdge(offset) {
+      context.beginPath();
+      for (let y = -40; y <= 740; y += 20) {
+        const x = roadCenter(y) + offset;
+        if (y === -40) context.moveTo(x, y); else context.lineTo(x, y);
       }
     }
 
@@ -218,18 +228,20 @@
     function render() {
       context.setTransform(scale, 0, 0, scale, (width - 1000 * scale) / 2, (height - 700 * scale) / 2);
       drawCyberCity();
-      context.fillStyle = '#141326'; context.fillRect(225, 0, 550, 700);
       const road = context.createLinearGradient(250, 0, 750, 0); road.addColorStop(0, '#11162a'); road.addColorStop(.5, '#202239'); road.addColorStop(1, '#11162a');
-      context.fillStyle = road; context.fillRect(250, 0, 500, 700);
+      context.fillStyle = road; context.beginPath();
+      for (let y = -40; y <= 740; y += 20) context.lineTo(roadCenter(y) - 250, y);
+      for (let y = 740; y >= -40; y -= 20) context.lineTo(roadCenter(y) + 250, y);
+      context.closePath(); context.fill();
       context.shadowBlur = 16; context.shadowColor = '#28e7ff'; context.strokeStyle = '#28e7ff'; context.lineWidth = 5;
-      context.beginPath(); context.moveTo(250, 0); context.lineTo(250, 700); context.stroke();
-      context.shadowColor = '#ff3bd4'; context.strokeStyle = '#ff3bd4'; context.beginPath(); context.moveTo(750, 0); context.lineTo(750, 700); context.stroke();
+      traceRoadEdge(-250); context.stroke();
+      context.shadowColor = '#ff3bd4'; context.strokeStyle = '#ff3bd4'; traceRoadEdge(250); context.stroke();
       context.shadowBlur = 10; context.shadowColor = '#9b8cff'; context.strokeStyle = '#9b8cff'; context.lineWidth = 5; context.setLineDash([48, 102]); context.lineDashOffset = state.roadOffset;
-      for (const x of [425, 575]) { context.beginPath(); context.moveTo(x, -100); context.lineTo(x, 800); context.stroke(); }
+      for (const laneOffset of [-75, 75]) { traceRoadEdge(laneOffset); context.stroke(); }
       context.setLineDash([]); context.shadowBlur = 0;
       for (let y = -80 + state.roadOffset; y < 760; y += 150) {
-        context.fillStyle = '#28e7ff'; context.fillRect(232, y, 8, 62);
-        context.fillStyle = '#ff3bd4'; context.fillRect(760, y, 8, 62);
+        context.fillStyle = '#28e7ff'; context.fillRect(roadCenter(y) - 268, y, 8, 62);
+        context.fillStyle = '#ff3bd4'; context.fillRect(roadCenter(y) + 260, y, 8, 62);
       }
       for (const obstacle of state.obstacles) drawCar(obstacle);
       const blink = state.player.invulnerable > 0 && Math.floor(state.player.invulnerable * 10) % 2 === 0;
@@ -287,7 +299,7 @@
     window.render_game_to_text = () => JSON.stringify({
       coordinateSystem: 'logical 1000x700; origin top-left; x right; y down', mode: state.mode,
       player: { type: 'motorcycle', x: +state.player.x.toFixed(1), y: state.player.y, lean: +state.player.lean.toFixed(2), jumpHeight: +(state.player.jumpHeight || 0).toFixed(1), jumpCooldown: +state.player.jumpCooldown.toFixed(2), invulnerable: +state.player.invulnerable.toFixed(2) },
-      obstacles: state.obstacles.map(o => ({ type: trafficTypes[o.type].name, x: o.x, y: +o.y.toFixed(1) })), score: Math.floor(state.score),
+      roadCenterAtPlayer: +roadCenter(state.player.y).toFixed(1), obstacles: state.obstacles.map(o => ({ type: trafficTypes[o.type].name, lane: o.laneIndex, x: +o.x.toFixed(1), y: +o.y.toFixed(1) })), score: Math.floor(state.score),
       best: state.best, lives: state.lives, clears: state.clears, jumps: state.jumps, speed: Math.round(state.speed), tilt: +tilt.toFixed(2),
       connected: socket?.readyState === WebSocket.OPEN, pitchDelta: +pitchDelta.toFixed(2),
       pitchDeltaRange: { min: +pitchDeltaRange.min.toFixed(2), max: +pitchDeltaRange.max.toFixed(2) }, fullscreen: Boolean(document.fullscreenElement)
