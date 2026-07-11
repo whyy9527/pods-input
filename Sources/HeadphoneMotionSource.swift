@@ -17,6 +17,8 @@ final class HeadphoneMotionSource: NSObject, CMHeadphoneMotionManagerDelegate {
     private let stateLock = NSLock()
     private var shouldRun = false
     private var lastSampleTime = Date.distantPast
+    private var nextRecoveryTime = Date.distantPast
+    private var recoveryDelay: TimeInterval = 3
     private var watchdog: DispatchSourceTimer?
     private var warmupOrientations: [Orientation] = []
     private let warmupSampleCount = 50
@@ -62,6 +64,8 @@ final class HeadphoneMotionSource: NSObject, CMHeadphoneMotionManagerDelegate {
             }
             self.stateLock.lock()
             self.lastSampleTime = Date()
+            self.nextRecoveryTime = .distantPast
+            self.recoveryDelay = 3
             self.stateLock.unlock()
             let orientation = Orientation(
                 pitch: motion.attitude.pitch,
@@ -131,8 +135,13 @@ final class HeadphoneMotionSource: NSObject, CMHeadphoneMotionManagerDelegate {
 
     private func recoverIfStalled() {
         stateLock.lock()
-        let stalled = shouldRun && Date().timeIntervalSince(lastSampleTime) >= 3
-        if stalled { lastSampleTime = Date() }
+        let now = Date()
+        let stalled = shouldRun && now.timeIntervalSince(lastSampleTime) >= 3 && now >= nextRecoveryTime
+        if stalled {
+            lastSampleTime = now
+            nextRecoveryTime = now.addingTimeInterval(recoveryDelay)
+            recoveryDelay = min(recoveryDelay * 2, 60)
+        }
         stateLock.unlock()
         guard stalled else { return }
 
