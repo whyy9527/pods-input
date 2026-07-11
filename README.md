@@ -1,353 +1,73 @@
-# AirScrollBridge
+# PodsInput
 
-**A macOS menu bar application that transforms AirPods head motion into WebSocket data streams for scroll gestures and motion control.**
+Turn motion-capable AirPods into an open input device.
 
-![macOS](https://img.shields.io/badge/macOS-14.0+-blue)
-![Swift](https://img.shields.io/badge/Swift-5.9+-orange)
-![License](https://img.shields.io/badge/License-MIT-green)
+PodsInput is an early, hardware-first experiment. It reads three-axis headphone motion on macOS, calibrates the first sample as neutral, and publishes a small versioned JSON protocol over a local WebSocket. The first client is a browser racing demo controlled by tilting your head.
 
-## Overview
+## Why
 
-AirScrollBridge reads motion data from AirPods (3rd generation or later) using Core Motion's CMHeadphoneMotionManager and serves it via WebSocket connections. This enables developers to create innovative head-gesture-based interfaces for web applications, games, and accessibility tools.
+AirPods already contain low-latency motion sensors, but most software only uses them for spatial audio. PodsInput makes that signal reusable for games, creative tools, hands-free interaction, and accessibility experiments without a camera or cloud service.
 
-### Features
+## Current milestone
 
-- 🎧 **AirPods Motion Tracking**: Real-time head rotation and acceleration data
-- 🌐 **WebSocket Server**: Multi-client support with JSON data streaming  
-- 📱 **Menu Bar Interface**: Lightweight, always-accessible controls
-- ⚙️ **Configurable Settings**: Custom port, launch at login, energy saving
-- 🔒 **Privacy-First**: All data stays local, no cloud connections
-- 🔋 **Energy Efficient**: Smart motion detection with automatic sleep mode
-- 🧪 **Well Tested**: Comprehensive unit tests and error handling
+- AirPods motion input through `CMHeadphoneMotionManager`
+- Neutral-position calibration and angle-safe smoothing
+- Versioned WebSocket protocol on `127.0.0.1:17604`
+- Simulation mode for development without headphones
+- Zero-build Web Racer example
 
-## Requirements
+This is not yet an accessibility product or a production input driver. Hardware behaviour still needs to be measured with AirPods Pro 2 and AirPods 4.
 
-- **macOS 14.0 or later** (required for CMHeadphoneMotionManager)
-- **AirPods (3rd generation)** or **AirPods Pro** with motion sensors
-- **Xcode 15.0+** (for building from source)
+## Try the Web Racer
 
-## Installation
-
-### Option 1: Download Release (Recommended)
-
-1. Download the latest `AirScrollBridge-x.x.x.dmg` from [Releases](releases)
-2. Mount the DMG and drag AirScrollBridge to Applications
-3. Launch AirScrollBridge from Applications
-4. Grant motion permissions when prompted
-
-### Option 2: Build from Source
+Requirements: macOS 14+, Swift 5.9+, and motion-capable AirPods for hardware mode.
 
 ```bash
-# Clone the repository
-git clone https://github.com/yourusername/air-scroll-bridge.git
-cd air-scroll-bridge
-
-# Build the application
-swift build --configuration release
-
-# Run directly (for development)
-swift run
-
-# Or create a signed app bundle
-./scripts/sign_and_notarize.sh
-
-# Create distributable DMG
-./scripts/make_dmg.sh
+swift run pods-input --simulate
+open examples/web-racer/index.html
 ```
 
-## Quick Start
+Then tilt left or right. Simulation mode generates the same protocol as real hardware.
 
-1. **Launch** AirScrollBridge from Applications or menu bar
-2. **Grant Permissions** when prompted for Motion & Fitness access
-3. **Connect AirPods** and ensure they're selected as audio output
-4. **Check Connection** - the menu bar icon fills when clients connect
-5. **Test WebSocket** connection at `ws://localhost:17604/`
+For AirPods input:
 
-### Example WebSocket Client
-
-```javascript
-// Connect to AirScrollBridge
-const ws = new WebSocket('ws://localhost:17604/');
-
-ws.onmessage = (event) => {
-    const motionData = JSON.parse(event.data);
-    
-    // Use rotation for scrolling
-    const { pitch, yaw, roll } = motionData.attitude;
-    
-    // Scroll based on head nod (pitch)
-    if (Math.abs(pitch) > 0.1) {
-        window.scrollBy(0, pitch * 100);
-    }
-    
-    // Horizontal scroll based on head turn (yaw)  
-    if (Math.abs(yaw) > 0.1) {
-        window.scrollBy(yaw * 100, 0);
-    }
-};
-
-ws.onerror = (error) => console.error('WebSocket error:', error);
+```bash
+swift run pods-input
 ```
 
-## Motion Data Format
+Connect and wear the headphones before launching. A distributable signed app bundle with a proper Motion & Fitness permission flow is the next milestone; direct SwiftPM execution may be constrained by macOS privacy controls.
 
-AirScrollBridge streams JSON data with the following structure:
+Run the hardware-independent core checks with:
+
+```bash
+swift run pods-input-self-test
+```
+
+## Protocol v1
+
+Each WebSocket text frame contains one motion event. Angles and rotation rates are radians; acceleration is measured in g.
 
 ```json
 {
-    "timestamp": 1640995200.123,
-    "attitude": {
-        "pitch": -0.05,
-        "yaw": 0.12,
-        "roll": 0.03
-    },
-    "rotationRate": {
-        "x": 0.001,
-        "y": -0.003,
-        "z": 0.002
-    },
-    "userAcceleration": {
-        "x": 0.01,
-        "y": 0.02,
-        "z": -0.01
-    }
+  "protocolVersion": 1,
+  "type": "motion",
+  "sequence": 42,
+  "timestamp": 1770000000.125,
+  "orientation": { "pitch": 0.01, "yaw": -0.03, "roll": 0.12 },
+  "rotationRate": { "x": 0.0, "y": 0.0, "z": 0.0 },
+  "userAcceleration": { "x": 0.0, "y": 0.0, "z": 0.0 }
 }
 ```
 
-### Data Fields
-
-- **`timestamp`**: Unix timestamp with millisecond precision
-- **`attitude`**: Head orientation in radians
-  - `pitch`: Forward/backward tilt (nodding)
-  - `yaw`: Left/right turn
-  - `roll`: Side-to-side tilt
-- **`rotationRate`**: Angular velocity in radians/second
-- **`userAcceleration`**: Linear acceleration excluding gravity (m/s²)
-
-## Configuration
-
-### Menu Bar Controls
-
-- **Motion Data Display**: Real-time pitch/yaw/roll values
-- **Connection Count**: Number of active WebSocket clients
-- **Server Port**: Configurable (default: 17604)
-- **Launch at Login**: Auto-start with macOS
-- **Energy Saving**: Reduce update frequency when idle
-
-### Advanced Settings
-
-Edit preferences via the menu bar popover:
-
-- **Update Frequency**: 30-120 Hz (default: 60 Hz)
-- **Motion Threshold**: Sensitivity for gesture detection  
-- **Auto-Sleep**: Minutes of inactivity before sleep mode
-- **WebSocket Timeout**: Client connection timeout
-
-## Development
-
-### Project Structure
-
-```
-air-scroll-bridge/
-├── Sources/
-│   ├── AppDelegate.swift          # Main app and menu bar
-│   ├── MotionManager.swift        # Core Motion handling
-│   ├── WebSocketServer.swift      # SwiftNIO WebSocket server
-│   ├── PopoverViewController.swift # UI controls
-│   ├── Preferences.swift          # Settings management
-│   └── main.swift                 # Entry point
-├── Tests/
-│   └── AirScrollBridgeTests.swift # Unit tests
-├── scripts/
-│   ├── sign_and_notarize.sh       # Code signing
-│   └── make_dmg.sh                # DMG creation
-└── Package.swift                  # Dependencies
-```
-
-### Dependencies
-
-- **SwiftNIO**: High-performance WebSocket server
-- **NIOWebSocket**: WebSocket protocol implementation  
-- **Combine**: Reactive programming for data streams
-
-### Building & Testing
-
-```bash
-# Run unit tests
-swift test
-
-# Build for debugging
-swift build
-
-# Build optimized release
-swift build --configuration release
-
-# Run with verbose logging
-swift run --configuration debug
-```
-
-### Code Signing Setup
-
-For distribution, set these environment variables:
-
-```bash
-export DEVELOPER_ID="Developer ID Application: Your Name (TEAMID)"
-export NOTARIZATION_APPLE_ID="your@apple.id"
-export NOTARIZATION_PASSWORD="your-app-specific-password"
-export TEAM_ID="YOUR_TEAM_ID"
-```
-
-## Troubleshooting
-
-### Common Issues
-
-**AirPods Not Detected**
-
-
-- Ensure AirPods are connected and selected as audio output
-- Check Bluetooth connection in System Preferences
-- Try disconnecting and reconnecting AirPods
-
-
-**Permission Denied**
-
-- Go to System Preferences > Privacy & Security > Motion & Fitness
-- Enable access for AirScrollBridge
-- Restart the application after granting permissions
-
-
-**WebSocket Connection Failed**
-
-- Check if port 17604 is available (or change in preferences)
-- Verify firewall settings allow local connections
-
-- Try connecting to `ws://127.0.0.1:17604/` instead
-
-**High CPU Usage**
-
-- Enable Energy Saving mode in preferences
-
-- Reduce update frequency to 30 Hz
-- Close unused WebSocket connections
-
-**Build Errors**
-
-- Ensure Xcode 15.0+ and macOS 14.0+ SDK
-- Run `swift package clean` and rebuild
-- Check that all dependencies are properly resolved
-
-### Getting Help
-
-1. **Check Logs**: Use Console.app to view application logs
-2. **Reset Preferences**: Delete `~/Library/Preferences/com.example.airscrollbridge.plist`
-3. **Report Issues**: Open an issue on [GitHub](issues) with:
-   - macOS version
-   - AirPods model  
-   - Console logs
-
-   - Steps to reproduce
-
-## Use Cases
-
-### Web Development
-
-
-- **Scroll Control**: Natural head gestures for web scrolling
-- **3D Interfaces**: Head tracking for WebGL/Three.js applications
-- **Accessibility**: Hands-free navigation for motor impairments
-
-
-### Gaming
-
-- **Head Tracking**: First-person view control in web games
-- **Motion Controls**: Gesture-based gameplay mechanics
-- **VR/AR**: Head tracking for web-based immersive experiences
-
-### Productivity
-
-- **Presentation Control**: Hands-free slide navigation
-- **Music Control**: Head gestures for playback control
-- **Accessibility Tools**: Alternative input methods
-
-## Security & Privacy
-
-- **Local Processing**: All data processing happens on your device
-- **No Cloud**: No data is sent to external servers
-- **Sandboxed**: Application runs with minimal system permissions
-- **Open Source**: Full code transparency for security review
-
-## Contributing
-
-We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
-
-### Development Setup
-
-1. Fork the repository
-2. Create a feature branch: `git checkout -b feature/amazing-feature`
-3. Make your changes and test thoroughly
-4. Commit with clear messages: `git commit -m 'Add amazing feature'`
-5. Push to your fork: `git push origin feature/amazing-feature`
-6. Open a Pull Request
+The orientation is relative to the first valid sample, which is treated as the neutral pose.
 
 ## Roadmap
 
-- [ ] **Multiple Device Support**: Handle multiple AirPods simultaneously
-- [ ] **Custom Gestures**: User-defined gesture recognition
-
-- [ ] **Plugin System**: Extensible processing pipeline
-- [ ] **Mobile App**: iOS companion for configuration
-- [ ] **API Expansion**: REST API alongside WebSocket
-- [ ] **Cloud Sync**: Optional cloud-based configuration backup
-
-## Development Status
-
-### ✅ Completed
-
-- **Core Implementation**: All Swift source files implemented and compiling
-- **WebSocket Server**: SwiftNIO-based multi-client WebSocket server
-
-- **Motion Management**: Core Motion integration with CMHeadphoneMotionManager
-- **Menu Bar Interface**: Complete AppKit-based menu bar application
-- **Preferences System**: UserDefaults-based settings with launch-at-login
-
-- **Build System**: Swift Package Manager configuration with all dependencies
-- **Documentation**: Comprehensive README, setup guides, and API documentation
-- **Build Scripts**: Code signing, notarization, and DMG creation scripts
-- **Project Structure**: Professional Swift package layout
-
-### 🔄 Current Status
-
-
-The project **builds successfully** with `swift build --configuration release` and all major components are implemented. The application creates a proper macOS app bundle structure.
-
-### 🧪 Testing Needed
-
-- **Hardware Testing**: Test with actual AirPods and motion permissions
-- **WebSocket Verification**: Multi-client connection testing
-- **UI Testing**: Menu bar interface and popover functionality
-- **Permission Flow**: Core Motion authorization handling
-- **Energy Management**: Battery usage optimization verification
-
-### 🚀 Next Steps
-
-1. **Open in Xcode**: `open Package.swift` for better development experience
-2. **Hardware Testing**: Connect AirPods and test motion detection
-3. **WebSocket Testing**: Use `./scripts/test_websocket.sh` to verify server
-4. **App Bundle Testing**: Test the created app bundle functionality
-5. **Distribution**: Set up Apple Developer credentials for code signing
+1. Record sampling rate, latency, drift, disconnect behaviour, and comfort with AirPods Pro 2 and AirPods 4.
+2. Add explicit recalibration and a signed menu-bar app.
+3. Add OpenTrack/FreeTrack UDP output for racing and flight games.
+4. Explore system scrolling, discrete nod/shake gestures, dwell, voice, and switch-assisted input.
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## Acknowledgments
-
-- **Apple** for Core Motion and CMHeadphoneMotionManager APIs
-- **SwiftNIO** team for excellent networking framework
-- **Community** contributors and testers
-
----
-
-**Made with ❤️ for the macOS community**
-
-For support, feature requests, or just to say hello, find us on [GitHub](https://github.com/yourusername/air-scroll-bridge)!
+MIT

@@ -1,284 +1,108 @@
 import Foundation
 import NIO
-import NIOWebSocket
 import NIOHTTP1
 import NIOPosix
-import Combine
+import NIOWebSocket
+import PodsInputCore
 
-class WebSocketServer: ObservableObject {
-    // MARK: - Properties
-    private var eventLoopGroup: EventLoopGroup?
+final class WebSocketServer {
+    private let group = MultiThreadedEventLoopGroup(numberOfThreads: 1)
     private var channel: Channel?
-    private var isRunning = false
-    private let port: Int
-    
-    // Connected clients
-    private var connectedClients = Set<WebSocketClient>()
+    private var clients: [ObjectIdentifier: Channel] = [:]
     private let clientsLock = NSLock()
-    
-    // Publishers
-    private let connectionCountSubject = CurrentValueSubject<Int, Never>(0)
-    var connectionCountPublisher: AnyPublisher<Int, Never> {
-        connectionCountSubject.eraseToAnyPublisher()
-    }
-    
-    // MARK: - Initialization
-    init(port: Int = 17604) {
-        self.port = port
-    }
-    
-    deinit {
-        stop()
-    }
-    
-    // MARK: - Server Lifecycle
-    func start() {
-        guard !isRunning else {
-            print("⚠️ WebSocket server already running on port \(port)")
-            return
-        }
-        
-        eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: 2)
-        
-        let bootstrap = ServerBootstrap(group: eventLoopGroup!)
-            .serverChannelOption(ChannelOptions.backlog, value: 256)
+
+    func start(port: Int) throws {
+        let upgrader = NIOWebSocketServerUpgrader(
+            shouldUpgrade: { channel, _ in channel.eventLoop.makeSucceededFuture(HTTPHeaders()) },
+            upgradePipelineHandler: { [weak self] channel, _ in
+                guard let self else { return channel.eventLoop.makeSucceededVoidFuture() }
+                return channel.pipeline.addHandler(WebSocketHandler(
+                    onConnect: { self.add($0) },
+                    onDisconnect: { self.remove($0) }
+                ))
+            }
+        )
+        let configuration = NIOHTTPServerUpgradeConfiguration(
+            upgraders: [upgrader],
+            completionHandler: { _ in }
+        )
+        channel = try ServerBootstrap(group: group)
             .serverChannelOption(ChannelOptions.socketOption(.so_reuseaddr), value: 1)
             .childChannelInitializer { channel in
-                self.configureChildChannel(channel)
+                channel.pipeline.configureHTTPServerPipeline(withServerUpgrade: configuration)
             }
-            .childChannelOption(ChannelOptions.socketOption(.tcp_nodelay), value: 1)
-            .childChannelOption(ChannelOptions.recvAllocator, value: AdaptiveRecvByteBufferAllocator())
-        
+            .bind(host: "127.0.0.1", port: port)
+            .wait()
+    }
+
+    func broadcast(_ event: MotionEvent) {
+        let payload: String
         do {
-            channel = try bootstrap.bind(host: "127.0.0.1", port: port).wait()
-            isRunning = true
-            print("🚀 WebSocket server started on ws://localhost:\(port)/")
+            payload = try event.encoded()
         } catch {
-            print("❌ Failed to start WebSocket server: \(error)")
-            eventLoopGroup?.shutdownGracefully { _ in }
-            eventLoopGroup = nil
+            fputs("Motion event encoding failed: \(error)\n", stderr)
+            return
+        }
+        clientsLock.lock()
+        let activeClients = Array(clients.values)
+        clientsLock.unlock()
+        for client in activeClients where client.isActive {
+            var buffer = client.allocator.buffer(capacity: payload.utf8.count)
+            buffer.writeString(payload)
+            client.writeAndFlush(WebSocketFrame(fin: true, opcode: .text, data: buffer), promise: nil)
         }
     }
-    
+
     func stop() {
-        guard isRunning else { return }
-        
-        isRunning = false
-        
-        // Close all client connections
+        try? channel?.close().wait()
+        try? group.syncShutdownGracefully()
+    }
+
+    private func add(_ channel: Channel) {
         clientsLock.lock()
-        for client in connectedClients {
-            client.close()
-        }
-        connectedClients.removeAll()
+        clients[ObjectIdentifier(channel)] = channel
         clientsLock.unlock()
-        
-        updateConnectionCount()
-        
-        // Close server channel
-        channel?.close(mode: .all, promise: nil)
-        channel = nil
-        
-        // Shutdown event loop group
-        eventLoopGroup?.shutdownGracefully { error in
-            if let error = error {
-                print("❌ Error shutting down event loop group: \(error)")
-            }
-        }
-        eventLoopGroup = nil
-        
-        print("⏹️ WebSocket server stopped")
     }
-    
-    // MARK: - Channel Configuration
-    private func configureChildChannel(_ channel: Channel) -> EventLoopFuture<Void> {
-        let httpHandler = HTTPHandler()
-        let webSocketUpgrader = NIOWebSocketServerUpgrader(
-            shouldUpgrade: { channel, head in
-                return channel.eventLoop.makeSucceededFuture(HTTPHeaders())
-            },
-            upgradePipelineHandler: { channel, head in
-                return self.configureWebSocketPipeline(channel)
-            }
-        )
-        
-        let config = NIOHTTPServerUpgradeConfiguration(
-            upgraders: [webSocketUpgrader],
-            completionHandler: { context in
-                // Remove HTTP handlers after upgrade - use string name for removal
-                _ = context.pipeline.removeHandler(name: "http-handler")
-            }
-        )
-        
-        return channel.pipeline.configureHTTPServerPipeline(withServerUpgrade: config).flatMap {
-            channel.pipeline.addHandler(httpHandler, name: "http-handler")
-        }
-    }
-    
-    private func configureWebSocketPipeline(_ channel: Channel) -> EventLoopFuture<Void> {
-        let webSocketHandler = WebSocketHandler { [weak self] client in
-            self?.addClient(client)
-        } onDisconnect: { [weak self] client in
-            self?.removeClient(client)
-        }
-        
-        return channel.pipeline.addHandler(webSocketHandler)
-    }
-    
-    // MARK: - Client Management
-    private func addClient(_ client: WebSocketClient) {
+
+    private func remove(_ channel: Channel) {
         clientsLock.lock()
-        connectedClients.insert(client)
+        clients.removeValue(forKey: ObjectIdentifier(channel))
         clientsLock.unlock()
-        
-        updateConnectionCount()
-        print("📱 Client connected (total: \(connectedClients.count))")
-    }
-    
-    private func removeClient(_ client: WebSocketClient) {
-        clientsLock.lock()
-        connectedClients.remove(client)
-        clientsLock.unlock()
-        
-        updateConnectionCount()
-        print("📱 Client disconnected (total: \(connectedClients.count))")
-    }
-    
-    private func updateConnectionCount() {
-        DispatchQueue.main.async { [weak self] in
-            guard let self = self else { return }
-            self.connectionCountSubject.send(self.connectedClients.count)
-        }
-    }
-    
-    // MARK: - Broadcasting
-    func broadcastMotionData(_ motionData: MotionData) {
-        guard !connectedClients.isEmpty else { return }
-        
-        let jsonString = motionData.jsonString
-        
-        clientsLock.lock()
-        let clients = Array(connectedClients)
-        clientsLock.unlock()
-        
-        for client in clients {
-            client.send(jsonString)
-        }
     }
 }
 
-// MARK: - HTTP Handler
-private class HTTPHandler: ChannelInboundHandler {
-    typealias InboundIn = HTTPServerRequestPart
-    typealias OutboundOut = HTTPServerResponsePart
-    
-    func channelRead(context: ChannelHandlerContext, data: NIOAny) {
-        let reqPart = unwrapInboundIn(data)
-        
-        switch reqPart {
-        case .head(let head):
-            if head.uri != "/" {
-                sendNotFoundResponse(context: context)
-            }
-        case .body, .end:
-            break
-        }
-    }
-    
-    private func sendNotFoundResponse(context: ChannelHandlerContext) {
-        let responseHead = HTTPResponseHead(
-            version: .init(major: 1, minor: 1),
-            status: .notFound
-        )
-        context.write(wrapOutboundOut(.head(responseHead)), promise: nil)
-        
-        let buffer = context.channel.allocator.buffer(string: "WebSocket endpoint available at /")
-        context.write(wrapOutboundOut(.body(.byteBuffer(buffer))), promise: nil)
-        context.writeAndFlush(wrapOutboundOut(.end(nil)), promise: nil)
-    }
-}
-
-// MARK: - WebSocket Handler
-fileprivate class WebSocketHandler: ChannelInboundHandler {
+private final class WebSocketHandler: ChannelInboundHandler {
     typealias InboundIn = WebSocketFrame
     typealias OutboundOut = WebSocketFrame
-    
-    private let onConnect: (WebSocketClient) -> Void
-    private let onDisconnect: (WebSocketClient) -> Void
-    private var client: WebSocketClient?
-    
-    init(onConnect: @escaping (WebSocketClient) -> Void, onDisconnect: @escaping (WebSocketClient) -> Void) {
+    private let onConnect: (Channel) -> Void
+    private let onDisconnect: (Channel) -> Void
+    private var isClosing = false
+
+    init(onConnect: @escaping (Channel) -> Void, onDisconnect: @escaping (Channel) -> Void) {
         self.onConnect = onConnect
         self.onDisconnect = onDisconnect
     }
-    
-    func handlerAdded(context: ChannelHandlerContext) {
-        client = WebSocketClient(context: context, handler: self)
-        if let client = client {
-            onConnect(client)
-        }
-    }
-    
+
+    func handlerAdded(context: ChannelHandlerContext) { onConnect(context.channel) }
     func handlerRemoved(context: ChannelHandlerContext) {
-        if let client = client {
-            onDisconnect(client)
-        }
+        if !isClosing { onDisconnect(context.channel) }
     }
-    
+
     func channelRead(context: ChannelHandlerContext, data: NIOAny) {
         let frame = unwrapInboundIn(data)
-        
-        switch frame.opcode {
-        case .connectionClose:
-            context.close(promise: nil)
-        case .ping:
-            let pongFrame = WebSocketFrame(fin: true, opcode: .pong, data: frame.data)
-            context.writeAndFlush(Self.wrapOutboundOut(pongFrame), promise: nil)
-        case .text, .binary:
-            // Echo received messages (optional, for testing)
-            context.writeAndFlush(data, promise: nil)
-        default:
-            break
+        if frame.opcode == .ping {
+            context.writeAndFlush(wrapOutboundOut(WebSocketFrame(fin: true, opcode: .pong, data: frame.data)), promise: nil)
+        } else if frame.opcode == .connectionClose {
+            isClosing = true
+            onDisconnect(context.channel)
+            let response = WebSocketFrame(fin: true, opcode: .connectionClose, data: frame.unmaskedData)
+            context.writeAndFlush(wrapOutboundOut(response)).whenComplete { _ in
+                context.close(promise: nil)
+            }
         }
     }
-    
-    func errorCaught(context: ChannelHandlerContext, error: Error) {
-        print("❌ WebSocket error: \(error)")
-        context.close(promise: nil)
-    }
-}
 
-// MARK: - WebSocket Client
-class WebSocketClient: Hashable, Equatable {
-    private let context: ChannelHandlerContext
-    private let handler: WebSocketHandler
-    private let id = UUID()
-    
-    fileprivate init(context: ChannelHandlerContext, handler: WebSocketHandler) {
-        self.context = context
-        self.handler = handler
-    }
-    
-    func send(_ message: String) {
-        guard context.channel.isActive else { return }
-        
-        var buffer = context.channel.allocator.buffer(capacity: message.utf8.count)
-        buffer.writeString(message)
-        
-        let frame = WebSocketFrame(fin: true, opcode: .text, data: buffer)
-        context.writeAndFlush(WebSocketHandler.wrapOutboundOut(frame), promise: nil)
-    }
-    
-    func close() {
+    func errorCaught(context: ChannelHandlerContext, error: Error) {
         context.close(promise: nil)
-    }
-    
-    // MARK: - Hashable & Equatable
-    func hash(into hasher: inout Hasher) {
-        hasher.combine(id)
-    }
-    
-    static func == (lhs: WebSocketClient, rhs: WebSocketClient) -> Bool {
-        return lhs.id == rhs.id
     }
 }

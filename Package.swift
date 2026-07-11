@@ -2,35 +2,46 @@
 import PackageDescription
 
 let package = Package(
-    name: "AirScrollBridge",
+    name: "PodsInput",
     platforms: [
-        .macOS(.v13)
+        .macOS(.v14)
     ],
     products: [
+        .library(
+            name: "PodsInputCore",
+            targets: ["PodsInputCore"]
+        ),
         .executable(
-            name: "AirScrollBridge",
-            targets: ["AirScrollBridge"]
+            name: "pods-input",
+            targets: ["PodsInput"]
+        ),
+        .executable(
+            name: "pods-input-self-test",
+            targets: ["PodsInputSelfTest"]
         ),
     ],
     dependencies: [
         .package(url: "https://github.com/apple/swift-nio.git", from: "2.60.0"),
-        .package(url: "https://github.com/apple/swift-nio-transport-services.git", from: "1.19.0"),
     ],
     targets: [
         .executableTarget(
-            name: "AirScrollBridge",
+            name: "PodsInput",
             dependencies: [
+                "PodsInputCore",
                 .product(name: "NIO", package: "swift-nio"),
                 .product(name: "NIOWebSocket", package: "swift-nio"),
                 .product(name: "NIOPosix", package: "swift-nio"),
-                .product(name: "NIOTransportServices", package: "swift-nio-transport-services"),
             ],
             path: "Sources"
         ),
-        .testTarget(
-            name: "AirScrollBridgeTests",
-            dependencies: ["AirScrollBridge"],
-            path: "Tests"
+        .target(
+            name: "PodsInputCore",
+            path: "Core"
+        ),
+        .executableTarget(
+            name: "PodsInputSelfTest",
+            dependencies: ["PodsInputCore"],
+            path: "SelfTest"
         ),
     ]
 )
