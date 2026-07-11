@@ -63,7 +63,7 @@
     const state = {
       mode: 'ready', score: 0, best: Number(localStorage.getItem('podsinput-best') || 0), lives: 3,
       elapsed: 0, speed: 260, spawnTimer: 0.8, spawnIndex: 0, roadOffset: 0,
-      player: { x: 500, y: 590, width: 34, height: 94, lean: 0, invulnerable: 0 }, obstacles: [], particles: []
+      player: { x: 500, y: 590, width: 44, height: 108, lean: 0, invulnerable: 0 }, obstacles: [], particles: []
     };
 
     function resize() {
@@ -148,20 +148,21 @@
     function drawMotorcycle(bike, alpha = 1) {
       const lean = bike.lean;
       context.save(); context.globalAlpha = alpha; context.translate(bike.x, bike.y); context.rotate(lean * 0.24);
-      context.fillStyle = '#16202a';
-      context.beginPath(); context.ellipse(-lean * 9 + 5, 4, 19, 49, 0, 0, Math.PI * 2); context.fill();
-      context.fillStyle = '#050a0f';
-      context.beginPath(); context.roundRect(-7, -49, 14, 29, 7); context.roundRect(-7, 24, 14, 30, 7); context.fill();
-      context.strokeStyle = '#dbe5ed'; context.lineWidth = 5; context.lineCap = 'round';
-      context.beginPath(); context.moveTo(-17, -24); context.lineTo(17, -24); context.stroke();
-      context.fillStyle = '#ff496d';
-      context.beginPath(); context.roundRect(-13, -28, 26, 57, 10); context.fill();
-      context.fillStyle = '#9d193b'; context.beginPath(); context.roundRect(-10, 9, 20, 28, 8); context.fill();
-      context.fillStyle = '#202b38'; context.beginPath(); context.ellipse(0, -2, 13, 18, 0, 0, Math.PI * 2); context.fill();
-      context.fillStyle = '#f2c7a5'; context.beginPath(); context.arc(0, -13, 9, 0, Math.PI * 2); context.fill();
-      context.fillStyle = '#fff'; context.beginPath(); context.arc(0, -15, 10, Math.PI, Math.PI * 2); context.fill();
-      context.fillStyle = '#9de5ff'; context.fillRect(-7, -19, 14, 5);
-      context.fillStyle = '#fff4b8'; context.beginPath(); context.arc(0, -43, 5, 0, Math.PI * 2); context.fill();
+      context.fillStyle = '#17202b'; context.beginPath(); context.ellipse(-lean * 11 + 7, 5, 28, 56, 0, 0, Math.PI * 2); context.fill();
+      context.fillStyle = '#05080c'; context.beginPath(); context.roundRect(-9, -55, 18, 20, 8); context.roundRect(-9, 39, 18, 20, 8); context.fill();
+      context.fillStyle = '#bf1734'; context.beginPath(); context.roundRect(-27, -43, 54, 86, 22); context.fill();
+      context.fillStyle = '#ed2f4d';
+      context.beginPath(); context.moveTo(-27, -32); context.quadraticCurveTo(-32, -51, -9, -58); context.lineTo(9, -58); context.quadraticCurveTo(32, -51, 27, -32); context.lineTo(24, 21); context.quadraticCurveTo(19, 49, 0, 54); context.quadraticCurveTo(-19, 49, -24, 21); context.closePath(); context.fill();
+      context.fillStyle = '#f84a61'; context.beginPath(); context.roundRect(-31, -20, 12, 52, 6); context.roundRect(19, -20, 12, 52, 6); context.fill();
+      context.fillStyle = '#871126'; context.beginPath(); context.roundRect(-19, 22, 38, 25, 12); context.fill();
+      context.fillStyle = '#1b2530'; context.beginPath(); context.ellipse(0, -4, 18, 27, 0, 0, Math.PI * 2); context.fill();
+      context.fillStyle = '#f2c7a5'; context.beginPath(); context.arc(0, -18, 9, 0, Math.PI * 2); context.fill();
+      context.fillStyle = '#e8edf2'; context.beginPath(); context.arc(0, -20, 11, Math.PI, Math.PI * 2); context.fill();
+      context.fillStyle = '#8edfff'; context.beginPath(); context.roundRect(-9, -25, 18, 6, 3); context.fill();
+      context.strokeStyle = '#e7edf2'; context.lineWidth = 4; context.lineCap = 'round'; context.beginPath(); context.moveTo(-22, -29); context.lineTo(22, -29); context.stroke();
+      context.fillStyle = '#ffe06a'; context.beginPath(); context.roundRect(-12, -44, 24, 8, 4); context.fill();
+      context.fillStyle = '#fff'; context.fillRect(-27, 4, 7, 17); context.fillRect(20, 4, 7, 17);
+      context.fillStyle = '#8b1024'; context.beginPath(); context.arc(-24, 36, 5, 0, Math.PI * 2); context.arc(24, 36, 5, 0, Math.PI * 2); context.fill();
       context.restore();
     }
 

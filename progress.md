@@ -34,3 +34,12 @@ Turn the Web Racer sensor demo into a small arcade game while keeping AirPods ti
 - Left/right banking screenshots passed independently (`lean=-0.75` and `lean=+0.75`).
 - Narrow motorcycle collision regression passed (center impact reduced lives from 3 to 2).
 - Review added tabular HUD numerals and 40px minimum control hit areas.
+
+## Futuristic fairing pass
+
+- Reworked the player into a low-slung crimson future bike inspired by the visual language of Kaneda's motorcycle.
+- Added a wide integrated fairing, mostly enclosed wheels, dark cockpit, side pods, white decals, and yellow console detail.
+- Kept original vector geometry and no external film assets or logos.
+- Neutral and left-banked silhouettes passed screenshot inspection.
+- Wider collision regression passed (center impact reduced lives from 3 to 2).
+- Final review found no protocol, game-loop, or UI regressions.
