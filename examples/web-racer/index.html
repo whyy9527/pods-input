@@ -50,7 +50,7 @@
     const message = document.querySelector('#message');
     const startButton = document.querySelector('#start');
     const bikeImage = new Image();
-    bikeImage.src = 'assets/future-bike.png';
+    bikeImage.src = 'assets/light-cycle-v1.png';
     const cityImage = new Image();
     cityImage.src = 'assets/cyber-city-v2.webp';
     const roadImage = new Image();
@@ -84,7 +84,7 @@
     const state = {
       mode: 'ready', score: 0, best: Number(localStorage.getItem('podsinput-best') || 0), lives: 3, clears: 0, jumps: 0,
       elapsed: 0, speed: 260, spawnTimer: 1.1, spawnIndex: 0, roadOffset: 0, level: 0, previousLevel: 0, levelBlend: 1, levelDistance: 0, totalDistance: 0, levelFlash: 0,
-      player: { x: 500, y: 590, width: 30, height: 96, lean: 0, jumpRemaining: 0, jumpCooldown: 0, invulnerable: 0 }, obstacles: [], particles: []
+      player: { x: 500, y: 590, width: 30, height: 104, lean: 0, jumpRemaining: 0, jumpCooldown: 0, invulnerable: 0 }, obstacles: [], particles: [], energyTrail: [], trailTimer: 0
     };
 
     function resize() {
@@ -96,7 +96,7 @@
     resize();
 
     function resetGame() {
-      Object.assign(state, { mode: 'playing', score: 0, lives: 3, clears: 0, jumps: 0, elapsed: 0, speed: 260, spawnTimer: 1.1, spawnIndex: 0, roadOffset: 0, level: 0, previousLevel: 0, levelBlend: 1, levelDistance: 0, totalDistance: 0, levelFlash: 2.2, obstacles: [], particles: [] });
+      Object.assign(state, { mode: 'playing', score: 0, lives: 3, clears: 0, jumps: 0, elapsed: 0, speed: 260, spawnTimer: 1.1, spawnIndex: 0, roadOffset: 0, level: 0, previousLevel: 0, levelBlend: 1, levelDistance: 0, totalDistance: 0, levelFlash: 2.2, obstacles: [], particles: [], energyTrail: [], trailTimer: 0 });
       Object.assign(state.player, { x: 500, y: 590, lean: 0, jumpRemaining: 0, jumpCooldown: 0, invulnerable: 0 });
       menu.hidden = true;
       render();
@@ -189,6 +189,13 @@
       const jumpProgress = state.player.jumpRemaining > 0 ? 1 - state.player.jumpRemaining / 0.85 : 0;
       const jumpHeight = state.player.jumpRemaining > 0 ? Math.sin(jumpProgress * Math.PI) * 90 : 0;
       state.player.jumpHeight = jumpHeight;
+      state.trailTimer -= dt;
+      if (state.trailTimer <= 0) {
+        state.energyTrail.push({ x: state.player.x - state.player.lean * 5, y: state.player.y + 45, life: .58 });
+        state.trailTimer = .035;
+      }
+      for (const point of state.energyTrail) { point.y += state.speed * dt * .34; point.life -= dt; }
+      state.energyTrail = state.energyTrail.filter(point => point.life > 0 && point.y < 760);
 
       for (const obstacle of state.obstacles) {
         obstacle.y += state.speed * dt;
@@ -255,10 +262,23 @@
       context.fillStyle = `rgba(15, 24, 34, ${0.68 - jumpHeight / 230})`; context.beginPath(); context.ellipse(-lean * 9 + 5, 8, 19 + jumpHeight * .07, 54 + jumpHeight * .04, 0, 0, Math.PI * 2); context.fill();
       context.translate(0, -jumpHeight * .16); context.scale(1 + jumpHeight / 430, 1 + jumpHeight / 430); context.rotate(lean * 0.24);
       if (bikeImage.complete && bikeImage.naturalWidth) {
-        context.drawImage(bikeImage, -18, -67, 36, 134);
+        context.drawImage(bikeImage, -17, -67, 34, 134);
       } else {
         context.fillStyle = '#ed2f4d'; context.beginPath(); context.roundRect(-15, -58, 30, 116, 15); context.fill();
         context.fillStyle = '#ffe06a'; context.fillRect(-8, -52, 16, 7);
+      }
+      context.restore();
+    }
+
+    function drawEnergyTrail() {
+      if (state.energyTrail.length < 2) return;
+      context.save(); context.lineCap = 'round'; context.lineJoin = 'round'; context.shadowColor = '#ff3b24'; context.shadowBlur = 18;
+      for (let index = 1; index < state.energyTrail.length; index++) {
+        const from = state.energyTrail[index - 1]; const to = state.energyTrail[index];
+        context.globalAlpha = Math.min(from.life, to.life) * 1.25;
+        context.strokeStyle = '#ff4a2c'; context.lineWidth = 8;
+        context.beginPath(); context.moveTo(from.x, from.y); context.lineTo(to.x, to.y); context.stroke();
+        context.strokeStyle = '#ffd0a8'; context.lineWidth = 2; context.stroke();
       }
       context.restore();
     }
@@ -285,6 +305,7 @@
         context.fillStyle = '#d6a758'; context.fillRect(roadCenter(y) - 264, y, 5, 42);
         context.fillRect(roadCenter(y) + 259, y, 5, 42);
       }
+      drawEnergyTrail();
       for (const obstacle of state.obstacles) drawCar(obstacle);
       const blink = state.player.invulnerable > 0 && Math.floor(state.player.invulnerable * 10) % 2 === 0;
       drawMotorcycle(state.player, blink ? 0.3 : 1);
@@ -346,7 +367,7 @@
 
     window.render_game_to_text = () => JSON.stringify({
       coordinateSystem: 'logical 1000x700; origin top-left; x right; y down', mode: state.mode,
-      player: { type: 'motorcycle', x: +state.player.x.toFixed(1), y: state.player.y, lean: +state.player.lean.toFixed(2), jumpHeight: +(state.player.jumpHeight || 0).toFixed(1), jumpCooldown: +state.player.jumpCooldown.toFixed(2), invulnerable: +state.player.invulnerable.toFixed(2) },
+      player: { type: 'light-cycle', x: +state.player.x.toFixed(1), y: state.player.y, lean: +state.player.lean.toFixed(2), jumpHeight: +(state.player.jumpHeight || 0).toFixed(1), jumpCooldown: +state.player.jumpCooldown.toFixed(2), invulnerable: +state.player.invulnerable.toFixed(2), trailPoints: state.energyTrail.length },
       level: { number: state.level + 1, name: levels[state.level].name, distance: Math.floor(state.levelDistance), target: levels[state.level].length, roadBlend: +state.levelBlend.toFixed(2) }, roadCenterAtPlayer: +roadCenter(state.player.y).toFixed(1), obstacles: state.obstacles.map(o => ({ type: trafficTypes[o.type].name, lane: o.laneIndex, x: +o.x.toFixed(1), y: +o.y.toFixed(1) })), score: Math.floor(state.score),
       best: state.best, lives: state.lives, clears: state.clears, jumps: state.jumps, speed: Math.round(state.speed), tilt: +tilt.toFixed(2),
       connected: socket?.readyState === WebSocket.OPEN, pitchDelta: +pitchDelta.toFixed(2),

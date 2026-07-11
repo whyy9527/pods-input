@@ -104,3 +104,13 @@ Turn the Web Racer sensor demo into a small arcade game while keeping AirPods ti
 - Automatic transition reached Level 2 at the configured distance with 3 lives intact.
 - Added a two-second smooth road-shape blend so existing traffic does not jump sideways when a new level begins; transition capture observed `roadBlend=0.4` mid-blend.
 - Level 1 collision passed (lives 3 to 2) and jump clear passed (`clears=1`, lives remains 3).
+
+## TRON Mode Light Cycle pass
+
+- Generated a narrow overhead black Light Cycle with red-orange energy bands, integrated rider, and enclosed wheels.
+- Replaced the crimson future-bike sprite while retaining the existing lean, jump, and collision behavior.
+- Added a short animated dual-layer energy trail that follows steering and fades behind the player.
+- Verify neutral/lean sprite clarity, trail behavior, collision, and jump clear.
+- Left-lean screenshot passed: Light Cycle remains readable and its energy trail bends along the steering path.
+- Normal collision passed (lives 3 to 2, trail remains active).
+- Jump clear passed (`clears=1`, `jumps=1`, lives remains 3).
