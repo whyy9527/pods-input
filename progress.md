@@ -24,3 +24,13 @@ Turn the Web Racer sensor demo into a small arcade game while keeping AirPods ti
 
 - Test difficulty and steering comfort with several people before tuning constants.
 - Consider sound and collectible power-ups only after the one-minute core loop feels good.
+
+## Motorcycle pass
+
+- Replaced the player car with a narrower top-down motorcycle and rider.
+- Added smoothed visual banking tied to the same AirPods/keyboard steering value.
+- Kept obstacle traffic as cars and narrowed the player collision body.
+- Verify left/right banking screenshots and collision regression.
+- Left/right banking screenshots passed independently (`lean=-0.75` and `lean=+0.75`).
+- Narrow motorcycle collision regression passed (center impact reduced lives from 3 to 2).
+- Review added tabular HUD numerals and 40px minimum control hit areas.

@@ -12,7 +12,7 @@
     .topbar { position: fixed; z-index: 2; inset: 20px 20px auto; display: flex; justify-content: space-between; align-items: flex-start; pointer-events: none; }
     .panel { padding: 11px 15px; border: 1px solid #ffffff70; border-radius: 14px; background: #11243dcc; box-shadow: 0 8px 30px #08213c35; backdrop-filter: blur(12px); }
     #status[data-connected="true"] { color: #72f1b8; }
-    button { padding: 8px 13px; border: 1px solid #ffffff55; border-radius: 9px; background: #ffffff18; color: inherit; font: inherit; font-weight: 700; cursor: pointer; pointer-events: auto; }
+    button { min-height: 40px; padding: 8px 13px; border: 1px solid #ffffff55; border-radius: 9px; background: #ffffff18; color: inherit; font: inherit; font-weight: 700; cursor: pointer; pointer-events: auto; }
     button:hover { background: #ffffff2b; transform: translateY(-1px); }
     .actions { display: flex; gap: 8px; margin-top: 9px; }
     .menu { position: fixed; z-index: 1; inset: 0; display: grid; place-items: center; background: #07172766; }
@@ -22,6 +22,7 @@
     .card p { color: #d9eaff; line-height: 1.55; }
     #start { min-width: 180px; padding: 12px 20px; background: #ff496d; border-color: #ffb3c1; font-size: 17px; }
     kbd { padding: 2px 7px; border: 1px solid #ffffff42; border-radius: 6px; background: #ffffff12; }
+    #telemetry { font-variant-numeric: tabular-nums; }
   </style>
 </head>
 <body>
@@ -62,7 +63,7 @@
     const state = {
       mode: 'ready', score: 0, best: Number(localStorage.getItem('podsinput-best') || 0), lives: 3,
       elapsed: 0, speed: 260, spawnTimer: 0.8, spawnIndex: 0, roadOffset: 0,
-      player: { x: 500, y: 590, width: 58, height: 104, invulnerable: 0 }, obstacles: [], particles: []
+      player: { x: 500, y: 590, width: 34, height: 94, lean: 0, invulnerable: 0 }, obstacles: [], particles: []
     };
 
     function resize() {
@@ -75,7 +76,7 @@
 
     function resetGame() {
       Object.assign(state, { mode: 'playing', score: 0, lives: 3, elapsed: 0, speed: 260, spawnTimer: 0.8, spawnIndex: 0, roadOffset: 0, obstacles: [], particles: [] });
-      Object.assign(state.player, { x: 500, y: 590, invulnerable: 0 });
+      Object.assign(state.player, { x: 500, y: 590, lean: 0, invulnerable: 0 });
       menu.hidden = true;
       render();
     }
@@ -121,6 +122,7 @@
       const keyboard = (keys.has('ArrowRight') ? 1 : 0) - (keys.has('ArrowLeft') ? 1 : 0);
       const steering = keyboard || tilt;
       state.player.x = Math.max(290, Math.min(710, state.player.x + steering * 330 * dt));
+      state.player.lean += (steering - state.player.lean) * Math.min(1, dt * 8);
       state.player.invulnerable = Math.max(0, state.player.invulnerable - dt);
 
       for (const obstacle of state.obstacles) {
@@ -143,6 +145,26 @@
       context.restore();
     }
 
+    function drawMotorcycle(bike, alpha = 1) {
+      const lean = bike.lean;
+      context.save(); context.globalAlpha = alpha; context.translate(bike.x, bike.y); context.rotate(lean * 0.24);
+      context.fillStyle = '#16202a';
+      context.beginPath(); context.ellipse(-lean * 9 + 5, 4, 19, 49, 0, 0, Math.PI * 2); context.fill();
+      context.fillStyle = '#050a0f';
+      context.beginPath(); context.roundRect(-7, -49, 14, 29, 7); context.roundRect(-7, 24, 14, 30, 7); context.fill();
+      context.strokeStyle = '#dbe5ed'; context.lineWidth = 5; context.lineCap = 'round';
+      context.beginPath(); context.moveTo(-17, -24); context.lineTo(17, -24); context.stroke();
+      context.fillStyle = '#ff496d';
+      context.beginPath(); context.roundRect(-13, -28, 26, 57, 10); context.fill();
+      context.fillStyle = '#9d193b'; context.beginPath(); context.roundRect(-10, 9, 20, 28, 8); context.fill();
+      context.fillStyle = '#202b38'; context.beginPath(); context.ellipse(0, -2, 13, 18, 0, 0, Math.PI * 2); context.fill();
+      context.fillStyle = '#f2c7a5'; context.beginPath(); context.arc(0, -13, 9, 0, Math.PI * 2); context.fill();
+      context.fillStyle = '#fff'; context.beginPath(); context.arc(0, -15, 10, Math.PI, Math.PI * 2); context.fill();
+      context.fillStyle = '#9de5ff'; context.fillRect(-7, -19, 14, 5);
+      context.fillStyle = '#fff4b8'; context.beginPath(); context.arc(0, -43, 5, 0, Math.PI * 2); context.fill();
+      context.restore();
+    }
+
     function render() {
       context.setTransform(scale, 0, 0, scale, (width - 1000 * scale) / 2, (height - 700 * scale) / 2);
       const sky = context.createLinearGradient(0, 0, 0, 700); sky.addColorStop(0, '#82d8ff'); sky.addColorStop(1, '#d8f5ff'); context.fillStyle = sky; context.fillRect(-500, 0, 2000, 700);
@@ -157,7 +179,7 @@
       }
       for (const obstacle of state.obstacles) drawCar(obstacle, `hsl(${obstacle.hue} 72% 55%)`);
       const blink = state.player.invulnerable > 0 && Math.floor(state.player.invulnerable * 10) % 2 === 0;
-      drawCar(state.player, '#ff496d', blink ? 0.3 : 1);
+      drawMotorcycle(state.player, blink ? 0.3 : 1);
       context.fillStyle = '#ffd166'; for (const p of state.particles) { context.globalAlpha = Math.max(0, p.life * 2); context.fillRect(p.x - 5, p.y - 5, 10, 10); } context.globalAlpha = 1;
       telemetry.textContent = `Score ${Math.floor(state.score)} · ${'♥'.repeat(state.lives)}${'♡'.repeat(3 - state.lives)} · ${Math.round(state.speed)} km/h`;
       context.setTransform(1, 0, 0, 1, 0, 0);
@@ -201,7 +223,7 @@
 
     window.render_game_to_text = () => JSON.stringify({
       coordinateSystem: 'logical 1000x700; origin top-left; x right; y down', mode: state.mode,
-      player: { x: +state.player.x.toFixed(1), y: state.player.y, invulnerable: +state.player.invulnerable.toFixed(2) },
+      player: { type: 'motorcycle', x: +state.player.x.toFixed(1), y: state.player.y, lean: +state.player.lean.toFixed(2), invulnerable: +state.player.invulnerable.toFixed(2) },
       obstacles: state.obstacles.map(o => ({ x: o.x, y: +o.y.toFixed(1) })), score: Math.floor(state.score),
       best: state.best, lives: state.lives, speed: Math.round(state.speed), tilt: +tilt.toFixed(2),
       connected: socket?.readyState === WebSocket.OPEN, fullscreen: Boolean(document.fullscreenElement)
