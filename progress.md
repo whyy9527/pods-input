@@ -43,3 +43,21 @@ Turn the Web Racer sensor demo into a small arcade game while keeping AirPods ti
 - Neutral and left-banked silhouettes passed screenshot inspection.
 - Wider collision regression passed (center impact reduced lives from 3 to 2).
 - Final review found no protocol, game-loop, or UI regressions.
+
+## Jump pass
+
+- Added upward head-flick detection using a 220ms relative pitch window instead of drift-prone absolute pitch.
+- Initial live threshold: pitch delta below -4.5 degrees.
+- Added Space fallback, 0.85s jump arc, 1.1s cooldown, airborne collision bypass, shadow/scale feedback, and 25-point vehicle-clear bonus.
+- Verify takeoff/apex/landing, collision bypass, cooldown, and ordinary collision regression.
+- Apex visual passed (`jumpHeight=90`).
+- First clear attempt was confounded by live asynchronous tilt during deterministic stepping.
+- Test mode now zeroes live tilt and exposes `clears`; real-time play remains unchanged.
+- Clear bonus triggered, exposing a landing-tail bug where the same cleared car could collide again.
+- Cleared (`jumped`) obstacles now skip all later collision checks.
+- Deterministic clear passed (`clears=1`, lives=3); no-jump collision passed (lives=2).
+- Added observable `jumps` count for live AirPods gesture verification.
+- First live gesture did not cross -4.5 degrees; lowered threshold to -2.5 based on measured ~3-degree gesture and sub-0.5-degree idle noise.
+- Five-second idle test produced no false jump.
+- Live browser capture did not observe a deliberate flick (range -0.16 to +0.74 degrees), so hardware trigger direction/threshold remains a user-playtest item.
+- Work review passed with hardware gesture tuning explicitly retained as residual risk rather than reported as verified.
