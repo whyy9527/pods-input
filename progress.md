@@ -72,3 +72,13 @@ Turn the Web Racer sensor demo into a small arcade game while keeping AirPods ti
 - Generated sprite passed screenshot inspection at full lean; it reads clearly without the previous wide silhouette.
 - Normal collision regression passed (lives 3 to 2 after 250 frames).
 - Timed jump-clear regression passed (`clears=1`, `jumps=1`, lives remains 3).
+
+## Cyber traffic and road pass
+
+- Generated and keyed four overhead traffic sprites: blue Model 3, white Model Y, gold Cybercab, and silver Cybertruck.
+- Replaced generic colored traffic rectangles with rotating generated vehicle types and type-specific dimensions.
+- Rebuilt the daytime road as a dark cyberpunk city route with moving building strips, cyan/magenta edge rails, and violet lane light trails.
+- Verify every traffic model appears, transparent edges remain clean on the dark road, and steering/jump/collision behavior is unchanged.
+- Traffic montage and gameplay screenshots passed alpha-edge and silhouette inspection for all four models.
+- Early gameplay shows Model 3 then Model Y; later jump capture shows Cybercab and Cybertruck.
+- Normal collision still reduces lives from 3 to 2; jump clear still records `clears=1`, `jumps=1`, with 3 lives.

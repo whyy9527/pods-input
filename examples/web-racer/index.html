@@ -7,7 +7,7 @@
   <style>
     :root { color-scheme: dark; font-family: ui-rounded, system-ui, sans-serif; }
     * { box-sizing: border-box; }
-    body { margin: 0; overflow: hidden; background: #87d9ff; color: #fff; }
+    body { margin: 0; overflow: hidden; background: #09051a; color: #fff; }
     canvas { display: block; width: 100vw; height: 100vh; }
     .topbar { position: fixed; z-index: 2; inset: 20px 20px auto; display: flex; justify-content: space-between; align-items: flex-start; pointer-events: none; }
     .panel { padding: 11px 15px; border: 1px solid #ffffff70; border-radius: 14px; background: #11243dcc; box-shadow: 0 8px 30px #08213c35; backdrop-filter: blur(12px); }
@@ -51,6 +51,13 @@
     const startButton = document.querySelector('#start');
     const bikeImage = new Image();
     bikeImage.src = 'assets/future-bike.png';
+    const trafficTypes = [
+      { name: 'Model 3', src: 'assets/traffic/model-3.png', width: 54, height: 112 },
+      { name: 'Model Y', src: 'assets/traffic/model-y.png', width: 58, height: 112 },
+      { name: 'Cybercab', src: 'assets/traffic/cybercab.png', width: 54, height: 116 },
+      { name: 'Cybertruck', src: 'assets/traffic/cybertruck.png', width: 58, height: 126 }
+    ];
+    for (const traffic of trafficTypes) { traffic.image = new Image(); traffic.image.src = traffic.src; }
     const keys = new Set();
     const lanes = [350, 500, 650];
     const spawnPattern = [1, 0, 2, 1, 2, 0, 1, 0, 2];
@@ -97,7 +104,9 @@
 
     function spawnObstacle() {
       const lane = lanes[spawnPattern[state.spawnIndex++ % spawnPattern.length]];
-      state.obstacles.push({ x: lane, y: -90, width: 58, height: 98, hue: (state.spawnIndex * 67) % 360 });
+      const type = (state.spawnIndex - 1) % trafficTypes.length;
+      const traffic = trafficTypes[type];
+      state.obstacles.push({ x: lane, y: -110, width: traffic.width, height: traffic.height, type });
     }
 
     function overlaps(a, b) {
@@ -159,13 +168,36 @@
       state.particles = state.particles.filter(particle => particle.life > 0);
     }
 
-    function drawCar(car, color, alpha = 1) {
+    function drawCar(car, alpha = 1) {
+      const traffic = trafficTypes[car.type];
       context.save(); context.globalAlpha = alpha; context.translate(car.x, car.y);
-      context.fillStyle = '#071421'; context.fillRect(-car.width * .56, -car.height * .34, car.width * 1.12, car.height * .68);
-      context.fillStyle = color; context.beginPath(); context.roundRect(-car.width / 2, -car.height / 2, car.width, car.height, 14); context.fill();
-      context.fillStyle = '#bce9ff'; context.beginPath(); context.roundRect(-car.width * .32, -car.height * .28, car.width * .64, car.height * .27, 7); context.fill();
-      context.fillStyle = '#fff4b8'; context.fillRect(-car.width * .34, -car.height * .48, car.width * .18, 7); context.fillRect(car.width * .16, -car.height * .48, car.width * .18, 7);
+      context.fillStyle = '#0009'; context.beginPath(); context.ellipse(4, 8, car.width * .52, car.height * .48, 0, 0, Math.PI * 2); context.fill();
+      if (traffic.image.complete && traffic.image.naturalWidth) {
+        context.drawImage(traffic.image, -car.width / 2, -car.height / 2, car.width, car.height);
+      } else {
+        context.fillStyle = '#b6c4dc'; context.beginPath(); context.roundRect(-car.width / 2, -car.height / 2, car.width, car.height, 12); context.fill();
+      }
       context.restore();
+    }
+
+    function drawCyberCity() {
+      const backdrop = context.createLinearGradient(0, 0, 1000, 700);
+      backdrop.addColorStop(0, '#09051a'); backdrop.addColorStop(.5, '#171032'); backdrop.addColorStop(1, '#07081c');
+      context.fillStyle = backdrop; context.fillRect(0, 0, 1000, 700);
+      for (let side = 0; side < 2; side++) {
+        const startX = side ? 790 : 24;
+        for (let row = -1; row < 6; row++) {
+          const y = row * 145 + state.roadOffset * .65;
+          const buildingWidth = 150 + ((row * 31 + side * 17) % 48);
+          context.fillStyle = row % 2 ? '#17162b' : '#211438';
+          context.fillRect(startX, y, buildingWidth, 112);
+          context.strokeStyle = side ? '#ff3bd455' : '#28e7ff55'; context.lineWidth = 3; context.strokeRect(startX, y, buildingWidth, 112);
+          for (let windowRow = 0; windowRow < 3; windowRow++) {
+            context.fillStyle = (row + windowRow) % 2 ? '#ff3bd4aa' : '#28e7ffbb';
+            context.fillRect(startX + 18, y + 18 + windowRow * 28, buildingWidth - 36, 5);
+          }
+        }
+      }
     }
 
     function drawMotorcycle(bike, alpha = 1) {
@@ -185,17 +217,21 @@
 
     function render() {
       context.setTransform(scale, 0, 0, scale, (width - 1000 * scale) / 2, (height - 700 * scale) / 2);
-      const sky = context.createLinearGradient(0, 0, 0, 700); sky.addColorStop(0, '#82d8ff'); sky.addColorStop(1, '#d8f5ff'); context.fillStyle = sky; context.fillRect(-500, 0, 2000, 700);
-      context.fillStyle = '#78bd68'; context.fillRect(0, 0, 1000, 700);
-      context.fillStyle = '#e8d8b0'; context.fillRect(225, 0, 550, 700);
-      context.fillStyle = '#334354'; context.fillRect(250, 0, 500, 700);
-      context.strokeStyle = '#f8edbd'; context.lineWidth = 8; context.setLineDash([70, 80]); context.lineDashOffset = state.roadOffset;
+      drawCyberCity();
+      context.fillStyle = '#141326'; context.fillRect(225, 0, 550, 700);
+      const road = context.createLinearGradient(250, 0, 750, 0); road.addColorStop(0, '#11162a'); road.addColorStop(.5, '#202239'); road.addColorStop(1, '#11162a');
+      context.fillStyle = road; context.fillRect(250, 0, 500, 700);
+      context.shadowBlur = 16; context.shadowColor = '#28e7ff'; context.strokeStyle = '#28e7ff'; context.lineWidth = 5;
+      context.beginPath(); context.moveTo(250, 0); context.lineTo(250, 700); context.stroke();
+      context.shadowColor = '#ff3bd4'; context.strokeStyle = '#ff3bd4'; context.beginPath(); context.moveTo(750, 0); context.lineTo(750, 700); context.stroke();
+      context.shadowBlur = 10; context.shadowColor = '#9b8cff'; context.strokeStyle = '#9b8cff'; context.lineWidth = 5; context.setLineDash([48, 102]); context.lineDashOffset = state.roadOffset;
       for (const x of [425, 575]) { context.beginPath(); context.moveTo(x, -100); context.lineTo(x, 800); context.stroke(); }
-      context.setLineDash([]);
+      context.setLineDash([]); context.shadowBlur = 0;
       for (let y = -80 + state.roadOffset; y < 760; y += 150) {
-        context.fillStyle = '#fff'; context.fillRect(220, y, 15, 72); context.fillRect(765, y, 15, 72);
+        context.fillStyle = '#28e7ff'; context.fillRect(232, y, 8, 62);
+        context.fillStyle = '#ff3bd4'; context.fillRect(760, y, 8, 62);
       }
-      for (const obstacle of state.obstacles) drawCar(obstacle, `hsl(${obstacle.hue} 72% 55%)`);
+      for (const obstacle of state.obstacles) drawCar(obstacle);
       const blink = state.player.invulnerable > 0 && Math.floor(state.player.invulnerable * 10) % 2 === 0;
       drawMotorcycle(state.player, blink ? 0.3 : 1);
       context.fillStyle = '#ffd166'; for (const p of state.particles) { context.globalAlpha = Math.max(0, p.life * 2); context.fillRect(p.x - 5, p.y - 5, 10, 10); } context.globalAlpha = 1;
@@ -251,7 +287,7 @@
     window.render_game_to_text = () => JSON.stringify({
       coordinateSystem: 'logical 1000x700; origin top-left; x right; y down', mode: state.mode,
       player: { type: 'motorcycle', x: +state.player.x.toFixed(1), y: state.player.y, lean: +state.player.lean.toFixed(2), jumpHeight: +(state.player.jumpHeight || 0).toFixed(1), jumpCooldown: +state.player.jumpCooldown.toFixed(2), invulnerable: +state.player.invulnerable.toFixed(2) },
-      obstacles: state.obstacles.map(o => ({ x: o.x, y: +o.y.toFixed(1) })), score: Math.floor(state.score),
+      obstacles: state.obstacles.map(o => ({ type: trafficTypes[o.type].name, x: o.x, y: +o.y.toFixed(1) })), score: Math.floor(state.score),
       best: state.best, lives: state.lives, clears: state.clears, jumps: state.jumps, speed: Math.round(state.speed), tilt: +tilt.toFixed(2),
       connected: socket?.readyState === WebSocket.OPEN, pitchDelta: +pitchDelta.toFixed(2),
       pitchDeltaRange: { min: +pitchDeltaRange.min.toFixed(2), max: +pitchDeltaRange.max.toFixed(2) }, fullscreen: Boolean(document.fullscreenElement)
