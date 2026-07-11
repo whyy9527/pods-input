@@ -92,3 +92,15 @@ Turn the Web Racer sensor demo into a small arcade game while keeping AirPods ti
 - Curved-road gameplay screenshot passed: road shape is readable, generated city sides remain subdued, and traffic follows lane curvature.
 - Center-lane collision passed on the moving curve (lives 3 to 2).
 - Curved-road jump clear passed (`clears=1`, `jumps=1`, lives remains 3).
+
+## Automatic level pass
+
+- Added four distance-driven stages: straight onboarding, gentle bends, faster esses, and a wide hairpin district.
+- Level progression is automatic and shown in the HUD plus a short stage banner.
+- Generated a restrained wet-asphalt texture and replaced neon road rails with metal guard edges, pale lane paint, and sparse amber reflectors.
+- One `roadCenter(y)` contract continues to own road rendering, traffic paths, collision alignment, and player bounds across all levels.
+- Verify the simplified road surface, straight Level 1, automatic transition, later curve amplitudes, collision, and jump clear.
+- Level 1 screenshot passed: straight, quiet wet-asphalt surface with subdued metal/amber edges.
+- Automatic transition reached Level 2 at the configured distance with 3 lives intact.
+- Added a two-second smooth road-shape blend so existing traffic does not jump sideways when a new level begins; transition capture observed `roadBlend=0.4` mid-blend.
+- Level 1 collision passed (lives 3 to 2) and jump clear passed (`clears=1`, lives remains 3).

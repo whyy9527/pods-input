@@ -53,6 +53,14 @@
     bikeImage.src = 'assets/future-bike.png';
     const cityImage = new Image();
     cityImage.src = 'assets/cyber-city-v2.webp';
+    const roadImage = new Image();
+    roadImage.src = 'assets/wet-asphalt-v1.webp';
+    const levels = [
+      { name: 'Straight Start', length: 2600, curve: 'straight' },
+      { name: 'Soft Bends', length: 3400, curve: 'gentle' },
+      { name: 'Night Esses', length: 4200, curve: 'esses' },
+      { name: 'Hairpin District', length: 5200, curve: 'hairpin' }
+    ];
     const trafficTypes = [
       { name: 'Model 3', src: 'assets/traffic/model-3.png', width: 54, height: 112 },
       { name: 'Model Y', src: 'assets/traffic/model-y.png', width: 58, height: 112 },
@@ -75,7 +83,7 @@
 
     const state = {
       mode: 'ready', score: 0, best: Number(localStorage.getItem('podsinput-best') || 0), lives: 3, clears: 0, jumps: 0,
-      elapsed: 0, speed: 260, spawnTimer: 1.1, spawnIndex: 0, roadOffset: 0,
+      elapsed: 0, speed: 260, spawnTimer: 1.1, spawnIndex: 0, roadOffset: 0, level: 0, previousLevel: 0, levelBlend: 1, levelDistance: 0, totalDistance: 0, levelFlash: 0,
       player: { x: 500, y: 590, width: 30, height: 96, lean: 0, jumpRemaining: 0, jumpCooldown: 0, invulnerable: 0 }, obstacles: [], particles: []
     };
 
@@ -88,7 +96,7 @@
     resize();
 
     function resetGame() {
-      Object.assign(state, { mode: 'playing', score: 0, lives: 3, clears: 0, jumps: 0, elapsed: 0, speed: 260, spawnTimer: 1.1, spawnIndex: 0, roadOffset: 0, obstacles: [], particles: [] });
+      Object.assign(state, { mode: 'playing', score: 0, lives: 3, clears: 0, jumps: 0, elapsed: 0, speed: 260, spawnTimer: 1.1, spawnIndex: 0, roadOffset: 0, level: 0, previousLevel: 0, levelBlend: 1, levelDistance: 0, totalDistance: 0, levelFlash: 2.2, obstacles: [], particles: [] });
       Object.assign(state.player, { x: 500, y: 590, lean: 0, jumpRemaining: 0, jumpCooldown: 0, invulnerable: 0 });
       menu.hidden = true;
       render();
@@ -111,9 +119,20 @@
       state.obstacles.push({ x: roadCenter(y) + (laneIndex - 1) * 150, y, width: traffic.width, height: traffic.height, type, laneIndex });
     }
 
+    function levelRoadCenter(levelIndex, y) {
+      const travel = state.totalDistance;
+      const curve = levels[levelIndex].curve;
+      if (curve === 'straight') return 500;
+      if (curve === 'gentle') return 500 + Math.sin((y + travel) / 260) * 30;
+      if (curve === 'esses') return 500 + Math.sin((y + travel) / 180) * 48 + Math.sin((y + travel) / 330 + 1.1) * 15;
+      return 500 + Math.sin((y + travel) / 225) * 102 + Math.sin((y + travel) / 480 + .8) * 18;
+    }
+
     function roadCenter(y) {
-      const travel = state.elapsed * 115;
-      return 500 + Math.sin((y + travel) / 175) * 42 + Math.sin((y + travel) / 310 + 1.1) * 14;
+      const previous = levelRoadCenter(state.previousLevel, y);
+      const current = levelRoadCenter(state.level, y);
+      const blend = state.levelBlend * state.levelBlend * (3 - 2 * state.levelBlend);
+      return previous + (current - previous) * blend;
     }
 
     function overlaps(a, b) {
@@ -140,6 +159,18 @@
       state.elapsed += dt;
       state.score += dt * (12 + state.speed / 55);
       state.speed = Math.min(560, 260 + state.elapsed * 10);
+      state.totalDistance += state.speed * dt;
+      state.levelDistance += state.speed * dt;
+      state.levelFlash = Math.max(0, state.levelFlash - dt);
+      state.levelBlend = Math.min(1, state.levelBlend + dt / 2);
+      const currentLevel = levels[state.level];
+      if (state.levelDistance >= currentLevel.length) {
+        state.levelDistance -= currentLevel.length;
+        state.previousLevel = state.level;
+        state.level = Math.min(state.level + 1, levels.length - 1);
+        state.levelBlend = 0;
+        state.levelFlash = 2.2;
+      }
       state.roadOffset = (state.roadOffset + state.speed * dt) % 150;
       state.spawnTimer -= dt;
       if (state.spawnTimer <= 0) {
@@ -210,6 +241,13 @@
       }
     }
 
+    function traceRoadSurface() {
+      context.beginPath();
+      for (let y = -40; y <= 740; y += 20) context.lineTo(roadCenter(y) - 250, y);
+      for (let y = 740; y >= -40; y -= 20) context.lineTo(roadCenter(y) + 250, y);
+      context.closePath();
+    }
+
     function drawMotorcycle(bike, alpha = 1) {
       const lean = bike.lean;
       const jumpHeight = bike.jumpHeight || 0;
@@ -228,26 +266,36 @@
     function render() {
       context.setTransform(scale, 0, 0, scale, (width - 1000 * scale) / 2, (height - 700 * scale) / 2);
       drawCyberCity();
-      const road = context.createLinearGradient(250, 0, 750, 0); road.addColorStop(0, '#11162a'); road.addColorStop(.5, '#202239'); road.addColorStop(1, '#11162a');
-      context.fillStyle = road; context.beginPath();
-      for (let y = -40; y <= 740; y += 20) context.lineTo(roadCenter(y) - 250, y);
-      for (let y = 740; y >= -40; y -= 20) context.lineTo(roadCenter(y) + 250, y);
-      context.closePath(); context.fill();
-      context.shadowBlur = 16; context.shadowColor = '#28e7ff'; context.strokeStyle = '#28e7ff'; context.lineWidth = 5;
+      context.save(); traceRoadSurface(); context.clip();
+      if (roadImage.complete && roadImage.naturalWidth) {
+        const roadTextureOffset = state.totalDistance % 1500;
+        context.drawImage(roadImage, 0, roadTextureOffset - 1500, 1000, 1500);
+        context.drawImage(roadImage, 0, roadTextureOffset, 1000, 1500);
+      } else {
+        context.fillStyle = '#1b1d26'; context.fillRect(0, 0, 1000, 700);
+      }
+      context.fillStyle = '#11152255'; context.fillRect(0, 0, 1000, 700); context.restore();
+      context.shadowBlur = 0; context.strokeStyle = '#7d8794'; context.lineWidth = 6;
       traceRoadEdge(-250); context.stroke();
-      context.shadowColor = '#ff3bd4'; context.strokeStyle = '#ff3bd4'; traceRoadEdge(250); context.stroke();
-      context.shadowBlur = 10; context.shadowColor = '#9b8cff'; context.strokeStyle = '#9b8cff'; context.lineWidth = 5; context.setLineDash([48, 102]); context.lineDashOffset = state.roadOffset;
+      traceRoadEdge(250); context.stroke();
+      context.strokeStyle = '#c3c8d0bb'; context.lineWidth = 4; context.setLineDash([48, 102]); context.lineDashOffset = state.roadOffset;
       for (const laneOffset of [-75, 75]) { traceRoadEdge(laneOffset); context.stroke(); }
       context.setLineDash([]); context.shadowBlur = 0;
       for (let y = -80 + state.roadOffset; y < 760; y += 150) {
-        context.fillStyle = '#28e7ff'; context.fillRect(roadCenter(y) - 268, y, 8, 62);
-        context.fillStyle = '#ff3bd4'; context.fillRect(roadCenter(y) + 260, y, 8, 62);
+        context.fillStyle = '#d6a758'; context.fillRect(roadCenter(y) - 264, y, 5, 42);
+        context.fillRect(roadCenter(y) + 259, y, 5, 42);
       }
       for (const obstacle of state.obstacles) drawCar(obstacle);
       const blink = state.player.invulnerable > 0 && Math.floor(state.player.invulnerable * 10) % 2 === 0;
       drawMotorcycle(state.player, blink ? 0.3 : 1);
       context.fillStyle = '#ffd166'; for (const p of state.particles) { context.globalAlpha = Math.max(0, p.life * 2); context.fillRect(p.x - 5, p.y - 5, 10, 10); } context.globalAlpha = 1;
-      telemetry.textContent = `Score ${Math.floor(state.score)} · ${'♥'.repeat(state.lives)}${'♡'.repeat(3 - state.lives)} · ${Math.round(state.speed)} km/h`;
+      if (state.levelFlash > 0) {
+        context.fillStyle = '#050711bb'; context.beginPath(); context.roundRect(360, 300, 280, 82, 18); context.fill();
+        context.fillStyle = '#fff'; context.font = '700 16px system-ui'; context.textAlign = 'center'; context.fillText(`LEVEL ${state.level + 1}`, 500, 332);
+        context.fillStyle = '#d6a758'; context.font = '800 23px system-ui'; context.fillText(levels[state.level].name, 500, 362); context.textAlign = 'start';
+      }
+      const levelProgress = Math.min(100, Math.floor(state.levelDistance / levels[state.level].length * 100));
+      telemetry.textContent = `L${state.level + 1} ${levelProgress}% · ${Math.floor(state.score)} · ${'♥'.repeat(state.lives)}${'♡'.repeat(3 - state.lives)} · ${Math.round(state.speed)} km/h`;
       context.setTransform(1, 0, 0, 1, 0, 0);
     }
 
@@ -299,7 +347,7 @@
     window.render_game_to_text = () => JSON.stringify({
       coordinateSystem: 'logical 1000x700; origin top-left; x right; y down', mode: state.mode,
       player: { type: 'motorcycle', x: +state.player.x.toFixed(1), y: state.player.y, lean: +state.player.lean.toFixed(2), jumpHeight: +(state.player.jumpHeight || 0).toFixed(1), jumpCooldown: +state.player.jumpCooldown.toFixed(2), invulnerable: +state.player.invulnerable.toFixed(2) },
-      roadCenterAtPlayer: +roadCenter(state.player.y).toFixed(1), obstacles: state.obstacles.map(o => ({ type: trafficTypes[o.type].name, lane: o.laneIndex, x: +o.x.toFixed(1), y: +o.y.toFixed(1) })), score: Math.floor(state.score),
+      level: { number: state.level + 1, name: levels[state.level].name, distance: Math.floor(state.levelDistance), target: levels[state.level].length, roadBlend: +state.levelBlend.toFixed(2) }, roadCenterAtPlayer: +roadCenter(state.player.y).toFixed(1), obstacles: state.obstacles.map(o => ({ type: trafficTypes[o.type].name, lane: o.laneIndex, x: +o.x.toFixed(1), y: +o.y.toFixed(1) })), score: Math.floor(state.score),
       best: state.best, lives: state.lives, clears: state.clears, jumps: state.jumps, speed: Math.round(state.speed), tilt: +tilt.toFixed(2),
       connected: socket?.readyState === WebSocket.OPEN, pitchDelta: +pitchDelta.toFixed(2),
       pitchDeltaRange: { min: +pitchDeltaRange.min.toFixed(2), max: +pitchDeltaRange.max.toFixed(2) }, fullscreen: Boolean(document.fullscreenElement)
