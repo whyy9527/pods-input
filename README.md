@@ -2,7 +2,7 @@
 
 Turn motion-capable AirPods into an open input device.
 
-PodsInput is an early, hardware-first experiment. It reads three-axis headphone motion on macOS, calibrates the first sample as neutral, and publishes a small versioned JSON protocol over a local WebSocket. The first client is a browser racing demo controlled by tilting your head.
+PodsInput is an early, hardware-first integration layer. It reads three-axis headphone motion on macOS, calibrates the first sample as neutral, and publishes a small versioned JSON protocol over a local WebSocket for other applications to consume.
 
 ## Why
 
@@ -16,20 +16,18 @@ AirPods already contain low-latency motion sensors, but most software only uses 
 - Browser connections restricted to local origins
 - Simulation mode for development without headphones
 - Explicit neutral-pose recalibration over the control protocol
-- Zero-build Web Racer example
 
 This is not yet an accessibility product or a production input driver. Hardware behaviour still needs to be measured with AirPods Pro 2 and AirPods 4.
 
-## Try the Web Racer
+## Run PodsInput
 
 Requirements: macOS 14+, Swift 5.9+, and motion-capable AirPods for hardware mode.
 
 ```bash
 swift run pods-input --simulate
-open examples/web-racer/index.html
 ```
 
-Then tilt left or right. Simulation mode generates the same protocol as real hardware.
+Simulation mode publishes the same protocol as real hardware, so consumers can develop without headphones.
 
 For AirPods input:
 
@@ -37,7 +35,7 @@ For AirPods input:
 swift run pods-input
 ```
 
-Connect and wear the headphones before launching. A distributable signed app bundle with a proper Motion & Fitness permission flow is the next milestone; direct SwiftPM execution may be constrained by macOS privacy controls.
+Connect and wear the headphones before launching. A distributable signed app bundle with a proper Motion & Fitness permission flow is the next milestone; direct SwiftPM execution may be constrained by macOS privacy controls. Consumers connect to `ws://127.0.0.1:17604` and should follow [PROTOCOL.md](PROTOCOL.md).
 
 Run the hardware-independent core checks with:
 

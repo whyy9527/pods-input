@@ -82,7 +82,7 @@ if simulate {
     }
     timer.resume()
     simulationTimer = timer
-    print("Simulation enabled. Open examples/web-racer/index.html to test without AirPods.")
+    print("Simulation enabled. Connect a protocol client to ws://127.0.0.1:17604.")
 } else {
     let motionSource = HeadphoneMotionSource { server.broadcast($0) }
     do {
